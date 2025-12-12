@@ -36,8 +36,8 @@ Support:
 For questions, issues, or feature requests, please contact us through GitHub.
     """,
     'category': 'Accounting/Accounting',
-    'author': 'Sefa Akgüneş',
-    'website': 'https://github.com/sefaakgunes',
+    'author': '7Dimensions',
+    'website': 'https://7dimensions.eu',
     'license': 'LGPL-3',
     'depends': ['account', 'hr'],
     'data': [
@@ -57,6 +57,6 @@ For questions, issues, or feature requests, please contact us through GitHub.
     'auto_install': False,
     'price': 149.00,
     'currency': 'EUR',
-    'support': 'sefaakgunes@7dimensions.eu',
-    'maintainer': 'Sefa Akgüneş',
+    'support': 'support@7dimensions.eu',
+    'maintainer': '7Dimensions',
 }
