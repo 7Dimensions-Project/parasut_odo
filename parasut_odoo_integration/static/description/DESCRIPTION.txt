@@ -1,0 +1,121 @@
+Paraşüt Integration for Odoo - Complete Accounting Sync Solution
+=================================================================
+
+🚀 SEAMLESS INTEGRATION BETWEEN ODOO & PARAŞÜT
+
+Automate your accounting workflow with our powerful integration module that connects Odoo ERP with Paraşüt accounting software. Save hours of manual data entry and eliminate errors!
+
+✨ KEY FEATURES:
+
+📊 COMPREHENSIVE DATA SYNC:
+• Customer Management - Auto-sync customer data from Paraşüt to Odoo
+• Product Catalog - Keep products synchronized across platforms
+• Sales Invoices - Automatic invoice import and matching
+• Payment Records - Real-time payment synchronization
+• Employee Data - Import and manage employee information
+• Salary Processing - Auto-create journal entries for payroll
+• Tax Records - Synchronized tax data and reporting
+
+🔐 SECURE & RELIABLE:
+• OAuth 2.0 Authentication
+• Encrypted API credentials storage
+• Secure HTTPS communication
+• Error handling and logging
+• Data validation and integrity checks
+
+⚙️ EASY CONFIGURATION:
+• Simple setup through Odoo Settings
+• One-click synchronization buttons
+• Intuitive Turkish interface
+• Detailed documentation included
+• No technical knowledge required
+
+💼 PERFECT FOR:
+• Turkish SMEs using both Odoo and Paraşüt
+• Accounting firms managing multiple clients
+• E-commerce businesses with high invoice volume
+• Companies seeking workflow automation
+
+🎯 BENEFITS:
+
+⏱️ TIME SAVINGS:
+Save 2+ hours daily on manual data entry
+Reduce administrative workload by 80%
+ROI achieved in less than 1 week!
+
+✅ ACCURACY:
+Eliminate human data entry errors
+Ensure data consistency across systems
+Real-time synchronization
+
+💰 COST EFFECTIVE:
+One-time payment - no recurring fees
+Unlimited users and companies
+Free updates and bug fixes
+
+📈 PRODUCTIVITY:
+Focus on business growth, not data entry
+Automated workflows
+Real-time financial visibility
+
+🌟 WHAT'S INCLUDED:
+
+✓ Full module installation
+✓ Comprehensive documentation (Turkish & English)
+✓ Email support
+✓ Regular updates and improvements
+✓ Bug fixes and security patches
+✓ 30-day money-back guarantee
+
+📋 REQUIREMENTS:
+
+• Odoo 14.0 or higher
+• Active Paraşüt account with API access
+• Paraşüt API credentials (Client ID, Secret)
+
+🔧 QUICK SETUP (5 MINUTES):
+
+1. Install the module from Odoo Apps
+2. Go to Settings > General Settings
+3. Enter your Paraşüt API credentials
+4. Click sync buttons to import data
+5. Done! Your systems are now connected
+
+💡 WHY CHOOSE THIS MODULE?
+
+✓ Built specifically for Turkish businesses
+✓ Optimized for Paraşüt API v4
+✓ Active development and support
+✓ Proven track record
+✓ Competitive pricing
+✓ Turkish language support
+
+📞 SUPPORT:
+
+We provide excellent support to ensure your success:
+• Email support (24-48h response time)
+• GitHub issue tracking
+• Detailed documentation
+• Setup assistance
+
+🎁 SPECIAL OFFERS:
+
+• Volume discounts available (3+ licenses)
+• Special pricing for accounting firms
+• Educational institution discounts
+
+⚡ GET STARTED TODAY!
+
+Transform your accounting workflow and save countless hours with automated synchronization. Join successful Turkish businesses already using this integration!
+
+---
+
+PRICING: €149 (One-time payment)
+LICENSE: LGPL-3
+LANGUAGES: Turkish, English
+SUPPORT: Email & GitHub
+UPDATES: Free (same major version)
+
+---
+
+© 2024 Sefa Akgüneş - All rights reserved

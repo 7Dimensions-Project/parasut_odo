@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odoo Paraşüt Entegrasyonu</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #764ba2;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+        .feature-card p {
+            margin: 10px 0 0 0;
+            font-size: 14px;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 10px 10px 0;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        ul li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .screenshot {
+            width: 100%;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 Odoo Paraşüt Entegrasyonu</h1>
+
+        <p style="font-size: 18px; color: #666;">
+            Odoo ERP sisteminizi Paraşüt muhasebe yazılımı ile sorunsuz bir şekilde entegre edin.
+            Verilerinizi otomatik olarak senkronize edin ve iş süreçlerinizi hızlandırın.
+        </p>
+
+        <div style="margin: 20px 0;">
+            <span class="badge">Odoo 14+</span>
+            <span class="badge">Paraşüt API v4</span>
+            <span class="badge">Türkçe Destek</span>
+            <span class="badge">Otomatik Senkronizasyon</span>
+        </div>
+
+        <h2>✨ Özellikler</h2>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>👥 Müşteri Yönetimi</h3>
+                <p>Paraşüt'teki müşteri bilgilerinizi Odoo'ya otomatik olarak aktarın ve güncel tutun.</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>📦 Ürün Senkronizasyonu</h3>
+                <p>Ürün kataloglarınızı tek tıkla senkronize edin, stok ve fiyat bilgilerini güncelleyin.</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>🧾 Fatura Entegrasyonu</h3>
+                <p>Satış faturalarınızı otomatik olarak Odoo'ya aktarın, manuel veri girişinden kurtulun.</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>💰 Ödeme Takibi</h3>
+                <p>Ödeme kayıtlarınızı senkronize edin, finansal raporlarınızı kolayca oluşturun.</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>👨‍💼 Personel Yönetimi</h3>
+                <p>Çalışan bilgilerinizi Paraşüt'ten Odoo'ya aktarın, HR süreçlerinizi entegre edin.</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>💵 Maaş Entegrasyonu</h3>
+                <p>Maaş ödemelerini yevmiye kayıtları olarak otomatik oluşturun.</p>
+            </div>
+        </div>
+
+        <h2>🎯 Neden Bu Modül?</h2>
+
+        <ul>
+            <li>Manuel veri girişini ortadan kaldırır</li>
+            <li>Hata riskini minimize eder</li>
+            <li>Zaman tasarrufu sağlar</li>
+            <li>Gerçek zamanlı veri senkronizasyonu</li>
+            <li>Kolay kurulum ve yapılandırma</li>
+            <li>Güvenli API bağlantısı</li>
+            <li>Detaylı hata raporlama</li>
+            <li>Türkçe arayüz ve dokümantasyon</li>
+        </ul>
+
+        <div class="highlight">
+            <strong>⚡ Hızlı Başlangıç:</strong> Modülü yükleyin, Paraşüt API bilgilerinizi girin ve tek tıkla
+            senkronizasyona başlayın!
+        </div>
+
+        <h2>📸 Ekran Görüntüleri</h2>
+
+        <div style="margin: 30px 0;">
+            <img src="screenshot_1.png" alt="Paraşüt Integration Settings" class="screenshot">
+            <p style="text-align: center; color: #666; margin-top: 10px;">Kolay yapılandırma arayüzü</p>
+        </div>
+
+        <div style="margin: 30px 0;">
+            <img src="screenshot_2.png" alt="Customer Synchronization" class="screenshot">
+            <p style="text-align: center; color: #666; margin-top: 10px;">Otomatik müşteri senkronizasyonu</p>
+        </div>
+
+        <div style="margin: 30px 0;">
+            <img src="screenshot_3.png" alt="Invoice Integration" class="screenshot">
+            <p style="text-align: center; color: #666; margin-top: 10px;">Fatura entegrasyonu</p>
+        </div>
+
+        <h2>💰 Fiyatlandırma</h2>
+
+        <div
+            style="background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); padding: 30px; border-radius: 10px; text-align: center; margin: 30px 0;">
+            <h3 style="font-size: 48px; color: #667eea; margin: 0;">€149</h3>
+            <p style="font-size: 18px; color: #666; margin: 10px 0;">Tek seferlik ödeme</p>
+            <ul style="text-align: left; max-width: 400px; margin: 20px auto;">
+                <li>Sınırsız kullanıcı</li>
+                <li>Sınırsız şirket</li>
+                <li>Tüm özellikler dahil</li>
+                <li>Ücretsiz güncellemeler</li>
+                <li>E-posta desteği</li>
+                <li>30 gün para iade garantisi</li>
+            </ul>
+            <a href="https://apps.odoo.com" class="btn" style="margin-top: 20px;">Şimdi Satın Al</a>
+        </div>
+
+        <h2>📋 Kurulum</h2>
+
+        <ol>
+            <li>Modülü Odoo addons klasörüne kopyalayın</li>
+            <li>Odoo'yu yeniden başlatın</li>
+            <li>Apps menüsünden modülü bulun ve yükleyin</li>
+            <li>Settings > General Settings'den Paraşüt API bilgilerinizi girin</li>
+            <li>Senkronizasyon butonlarına tıklayarak verilerinizi aktarın</li>
+        </ol>
+
+        <h2>⚙️ Yapılandırma</h2>
+
+        <p>Modül kurulduktan sonra <strong>Settings > General Settings</strong> menüsünden Paraşüt Integration bölümünü
+            bulun ve aşağıdaki bilgileri girin:</p>
+
+        <ul>
+            <li><strong>Client ID:</strong> Paraşüt API Client ID</li>
+            <li><strong>Client Secret:</strong> Paraşüt API Client Secret</li>
+            <li><strong>Username:</strong> Paraşüt hesap e-posta adresiniz</li>
+            <li><strong>Password:</strong> Paraşüt hesap şifreniz</li>
+            <li><strong>Company ID:</strong> Paraşüt şirket ID'niz</li>
+        </ul>
+
+        <h2>🔐 Güvenlik</h2>
+
+        <p>Bu modül, API kimlik bilgilerinizi güvenli bir şekilde saklar ve OAuth 2.0 protokolü ile Paraşüt API'sine
+            bağlanır. Tüm iletişim şifreli kanallar üzerinden gerçekleştirilir.</p>
+
+        <h2>📞 Destek</h2>
+
+        <p>Sorularınız veya önerileriniz için bizimle iletişime geçebilirsiniz:</p>
+        <ul>
+            <li>GitHub: <a href="https://github.com/sefaakgunes" target="_blank">sefaakgunes</a></li>
+            <li>Dokümantasyon: README.md dosyasına bakın</li>
+        </ul>
+
+        <h2>📄 Lisans</h2>
+
+        <p>Bu modül LGPL-3 lisansı altında yayınlanmıştır.</p>
+
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; text-align: center; color: #999;">
+            <p>© 2024 OdoParasutEklenti - Tüm hakları saklıdır.</p>
+        </div>
+    </div>
+</body>
+
+</html>

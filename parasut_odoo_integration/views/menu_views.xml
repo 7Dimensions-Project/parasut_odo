@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Define the action for the menu item -->
+        <!-- Using account.move (Journal Entries) as a placeholder model to verify the menu works -->
+        <record id="action_test_parasut" model="ir.actions.act_window">
+            <field name="name">Test Parasut</field>
+            <field name="res_model">account.move</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+            <field name="context">{}</field>
+        </record>
+
+        <!-- Define the menu item -->
+        <!-- Placed under the Accounting app root menu to appear as a top-level tab -->
+        <menuitem id="menu_test_parasut"
+                  name="Test Parasut"
+                  parent="account.menu_finance" 
+                  action="action_test_parasut"
+                  sequence="50"/>
+    </data>
+</odoo>
