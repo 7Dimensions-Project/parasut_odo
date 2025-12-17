@@ -55,8 +55,6 @@ For questions, issues, or feature requests, please contact us through GitHub.
     'installable': True,
     'application': False,
     'auto_install': False,
-    'price': 149.00,
-    'currency': 'EUR',
     'support': 'support@7dimensions.eu',
     'maintainer': '7Dimensions',
 }
