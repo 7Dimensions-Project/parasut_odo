@@ -6,7 +6,7 @@
         <field name="inherit_id" ref="account.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                 <app data-string="Parasut Integration" string="Parasut Integration" name="parasut_integration">
+                 <app data-string="Parasut Integration" string="Parasut Integration" name="parasut_muhasebe_entegrasyonu">
                     <block title="API Credentials" name="parasut_credentials">
                         <setting help="These credentials are required to connect with Parasut API. You can find them in your Parasut developer account.">
                             <div class="row mt16">
