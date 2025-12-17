@@ -500,51 +500,30 @@ class ResConfigSettings(models.TransientModel):
 
     def action_sync_salaries(self):
         """ Sync Salaries as Journal Entries (Maaş Kayıtları) """
-        # Salaries might be in purchase_bills with specific category or item_type
-        # Let's try fetching all purchase_bills and filter for salary-related ones
+        # Only fetch Bills that are identified as SALARY
         params = {'include': 'details,supplier,category', 'sort': '-issue_date'}
-        
         try:
             batches = self._fetch_from_parasut('purchase_bills', params=params)
         except:
-            # If that fails, try without category
-            batches = self._fetch_from_parasut('purchase_bills', params={'include': 'details,supplier', 'sort': '-issue_date'})
+             batches = self._fetch_from_parasut('purchase_bills', params={'include': 'details,supplier', 'sort': '-issue_date'})
         
         Move = self.env['account.move']
         Partner = self.env['res.partner']
         Journal = self.env['account.journal']
         
         processed = 0
-        
-        # Find or create general journal
         general_journal = Journal.search([('type', '=', 'general')], limit=1)
         if not general_journal:
-            return self._return_notification("Hata", "Genel yevmiye defteri bulunamadı.")
+             return self._return_notification("Hata", "Genel yevmiye defteri bulunamadı.")
         
         for batch in batches:
             for item in batch['data']:
-                attrs = item['attributes']
-                p_id = item['id']
-                
-                # Check if this is a salary-related bill
-                # Look for keywords in description or category
-                description = (attrs.get('description') or '').lower()
-                item_type = (attrs.get('item_type') or '').lower()
-                category_name = ''
-                
-                # Try to get category from relationships
-                if item.get('relationships', {}).get('category', {}).get('data'):
-                    cat_id = item['relationships']['category']['data']['id']
-                    cat_node = self._find_in_included(batch['included'], 'item_categories', cat_id)
-                    if cat_node:
-                        category_name = (cat_node['attributes'].get('name') or '').lower()
-                
-                # Check if it's salary-related
-                is_salary = any(keyword in description or keyword in item_type or keyword in category_name 
-                               for keyword in ['maaş', 'maas', 'salary', 'ücret', 'personel'])
-                
-                if not is_salary:
+                # ONLY Process if Salary
+                if self._get_bill_type(item, batch) != 'salary':
                     continue
+                
+                p_id = item['id']
+                attrs = item['attributes']
                 
                 # Check if already exists
                 if Move.search([('ref', 'like', f"MAAS-{p_id}%")], limit=1):
@@ -565,33 +544,15 @@ class ResConfigSettings(models.TransientModel):
                 amount = float(attrs.get('net_total') or 0.0)
                 date = attrs.get('issue_date')
                 
-                # Create Journal Entry
-                expense_account = self.env['account.account'].search([
-                    ('code', 'like', '770%'),
-                    ('account_type', '=', 'expense')
-                ], limit=1)
-                
-                payable_account = self.env['account.account'].search([
-                    ('code', 'like', '335%'),
-                    ('account_type', '=', 'liability_payable')
-                ], limit=1)
+                expense_account = self.env['account.account'].search([('code', 'like', '770%'), ('account_type', '=', 'expense')], limit=1)
+                payable_account = self.env['account.account'].search([('code', 'like', '335%'), ('account_type', '=', 'liability_payable')], limit=1)
                 
                 if not expense_account or not payable_account:
                     continue
                 
                 move_lines = [
-                    (0, 0, {
-                        'account_id': expense_account.id,
-                        'name': f"Maaş: {employee_name}",
-                        'debit': amount,
-                        'credit': 0,
-                    }),
-                    (0, 0, {
-                        'account_id': payable_account.id,
-                        'name': f"Maaş: {employee_name}",
-                        'debit': 0,
-                        'credit': amount,
-                    })
+                    (0, 0, {'account_id': expense_account.id, 'name': f"Maaş: {employee_name}", 'debit': amount, 'credit': 0}),
+                    (0, 0, {'account_id': payable_account.id, 'name': f"Maaş: {employee_name}", 'debit': 0, 'credit': amount})
                 ]
                 
                 move_vals = {
@@ -601,56 +562,36 @@ class ResConfigSettings(models.TransientModel):
                     'ref': f"MAAS-{p_id} ({employee_name})",
                     'line_ids': move_lines,
                 }
-                
-                move = Move.create(move_vals)
-                move.action_post()
+                Move.create(move_vals).action_post()
                 processed += 1
         
         return self._return_notification("Salaries Synced", f"{processed} salary entries created.")
 
     def action_sync_taxes(self):
         """ Sync Tax Payments as Journal Entries (Vergi Ödemeleri) """
-        # Taxes might be in purchase_bills with specific category
+        # Only fetch Bills that are identified as TAX
         params = {'include': 'details,supplier,category', 'sort': '-issue_date'}
-        
         try:
             batches = self._fetch_from_parasut('purchase_bills', params=params)
         except:
-            batches = self._fetch_from_parasut('purchase_bills', params={'include': 'details,supplier', 'sort': '-issue_date'})
+             batches = self._fetch_from_parasut('purchase_bills', params={'include': 'details,supplier', 'sort': '-issue_date'})
         
         Move = self.env['account.move']
         Journal = self.env['account.journal']
         
         processed = 0
-        
-        # Find or create general journal
         general_journal = Journal.search([('type', '=', 'general')], limit=1)
         if not general_journal:
             return self._return_notification("Hata", "Genel yevmiye defteri bulunamadı.")
         
         for batch in batches:
             for item in batch['data']:
-                attrs = item['attributes']
-                p_id = item['id']
-                
-                # Check if this is a tax-related bill
-                description = (attrs.get('description') or '').lower()
-                item_type = (attrs.get('item_type') or '').lower()
-                category_name = ''
-                
-                # Try to get category
-                if item.get('relationships', {}).get('category', {}).get('data'):
-                    cat_id = item['relationships']['category']['data']['id']
-                    cat_node = self._find_in_included(batch['included'], 'item_categories', cat_id)
-                    if cat_node:
-                        category_name = (cat_node['attributes'].get('name') or '').lower()
-                
-                # Check if it's tax-related
-                is_tax = any(keyword in description or keyword in item_type or keyword in category_name 
-                            for keyword in ['vergi', 'kdv', 'sgk', 'stopaj', 'tax'])
-                
-                if not is_tax:
+                # ONLY Process if Tax
+                if self._get_bill_type(item, batch) != 'tax':
                     continue
+                
+                p_id = item['id']
+                attrs = item['attributes']
                 
                 # Check if exists
                 if Move.search([('ref', 'like', f"VERGI-{p_id}%")], limit=1):
@@ -660,33 +601,15 @@ class ResConfigSettings(models.TransientModel):
                 amount = float(attrs.get('net_total') or 0.0)
                 date = attrs.get('issue_date')
                 
-                # Create Journal Entry
-                expense_account = self.env['account.account'].search([
-                    ('code', 'like', '770%'),
-                    ('account_type', '=', 'expense')
-                ], limit=1)
-                
-                payable_account = self.env['account.account'].search([
-                    ('code', 'like', '360%'),
-                    ('account_type', '=', 'liability_current')
-                ], limit=1)
+                expense_account = self.env['account.account'].search([('code', 'like', '770%'), ('account_type', '=', 'expense')], limit=1)
+                payable_account = self.env['account.account'].search([('code', 'like', '360%'), ('account_type', '=', 'liability_current')], limit=1)
                 
                 if not expense_account or not payable_account:
                     continue
                 
                 move_lines = [
-                    (0, 0, {
-                        'account_id': expense_account.id,
-                        'name': f"Vergi: {tax_name}",
-                        'debit': amount,
-                        'credit': 0,
-                    }),
-                    (0, 0, {
-                        'account_id': payable_account.id,
-                        'name': f"Vergi: {tax_name}",
-                        'debit': 0,
-                        'credit': amount,
-                    })
+                    (0, 0, {'account_id': expense_account.id, 'name': f"Vergi: {tax_name}", 'debit': amount, 'credit': 0}),
+                    (0, 0, {'account_id': payable_account.id, 'name': f"Vergi: {tax_name}", 'debit': 0, 'credit': amount})
                 ]
                 
                 move_vals = {
@@ -696,18 +619,42 @@ class ResConfigSettings(models.TransientModel):
                     'ref': f"VERGI-{p_id} ({tax_name})",
                     'line_ids': move_lines,
                 }
-                
-                move = Move.create(move_vals)
-                move.action_post()
+                Move.create(move_vals).action_post()
                 processed += 1
         
         return self._return_notification("Taxes Synced", f"{processed} tax entries created.")
 
 
+    def _get_bill_type(self, item, batch):
+        """ Helper to determine if a bill is regular, salary, or tax based on description/category """
+        attrs = item['attributes']
+        description = (attrs.get('description') or '').lower()
+        item_type = (attrs.get('item_type') or '').lower()
+        category_name = ''
+        
+        # Try to get category from relationships
+        if item.get('relationships', {}).get('category', {}).get('data'):
+            cat_id = item['relationships']['category']['data']['id']
+            cat_node = self._find_in_included(batch['included'], 'item_categories', cat_id)
+            if cat_node:
+                category_name = (cat_node['attributes'].get('name') or '').lower()
+                
+        # Check Keywords
+        # 1. Salary
+        if any(keyword in description or keyword in item_type or keyword in category_name 
+               for keyword in ['maaş', 'maas', 'salary', 'ücret', 'personel']):
+            return 'salary'
+            
+        # 2. Tax
+        if any(keyword in description or keyword in item_type or keyword in category_name 
+               for keyword in ['vergi', 'kdv', 'sgk', 'stopaj', 'tax', 'prim']):
+            return 'tax'
+            
+        return 'bill'
+
     def action_sync_purchase_bills(self):
-        """ Sync Purchase Bills (Gider Faturaları) """
-        # Removed filter[date_type] as it was causing 400 Bad Request
-        params = {'include': 'details,supplier', 'sort': '-issue_date'}
+        """ Sync Purchase Bills (Gider Faturaları) - EXCLUDING Salary and Tax """
+        params = {'include': 'details,supplier,category', 'sort': '-issue_date'}
         batches = self._fetch_from_parasut('purchase_bills', params=params)
         Move = self.env['account.move']
         Partner = self.env['res.partner']
@@ -716,6 +663,10 @@ class ResConfigSettings(models.TransientModel):
         
         for batch in batches:
             for item in batch['data']:
+                # SKIP if Salary or Tax
+                if self._get_bill_type(item, batch) != 'bill':
+                    continue
+                    
                 attrs = item['attributes']
                 p_id = item['id']
                 
@@ -732,10 +683,6 @@ class ResConfigSettings(models.TransientModel):
                         partner_id = partner_obj.id
                 
                 if not partner_id:
-                     # Attempt to find partner in included if not in DB yet (edge case)
-                     # Or create a dummy one? Better to skip or ensure contacts synced first.
-                     # For now, let's create a placeholder or error? script finds or creates.
-                     # We will create a simple one if name exists in included.
                      supp_data = item['relationships']['supplier']['data']
                      if supp_data:
                          supp_node = self._find_in_included(batch['included'], 'contacts', supp_data['id'])
@@ -744,7 +691,7 @@ class ResConfigSettings(models.TransientModel):
                              partner_id = Partner.create(p_vals).id
 
                 if not partner_id:
-                    continue # Skip if no partner
+                    continue 
                 
                 # Prepare Lines
                 invoice_lines = []
@@ -759,10 +706,6 @@ class ResConfigSettings(models.TransientModel):
                             'quantity': float(d_attrs.get('quantity', 1.0)),
                             'price_unit': float(d_attrs.get('unit_price', 0.0)),
                         }
-                        # We are ignoring TAX mapping for simplicity now, odoo handles it if configured, 
-                        # or we can force tax amount if we handle 'price_include' logic carefully.
-                        # Script search for tax by amount.
-                        
                         invoice_lines.append((0, 0, line_vals))
                 
                 # Fallback line
