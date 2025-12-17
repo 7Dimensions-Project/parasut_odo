@@ -54,7 +54,7 @@ For questions, issues, or feature requests, please contact us through GitHub.
     'installable': True,
     'application': True,
     'auto_install': False,
-    'license': 'In-App-Purchase',
+    'license': 'OPL-1',
     'price': 0.00,
     'currency': 'EUR',
     'support': 'support@7dimensions.eu',
