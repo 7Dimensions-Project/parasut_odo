@@ -1,6 +1,6 @@
 {
     'name': 'Paraşüt Odoo Muhasebe Entegrasyonu',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'summary': 'Paraşüt ve Odoo arasında otomatik muhasebe senkronizasyonu',
     'description': """
 Paraşüt Odoo Muhasebe Entegrasyonu
@@ -54,8 +54,8 @@ For questions, issues, or feature requests, please contact us through GitHub.
     'installable': True,
     'application': True,
     'auto_install': False,
-    'license': 'OPL-1',
-    'price': 150.00,
+    'license': 'In-App-Purchase',
+    'price': 0.00,
     'currency': 'EUR',
     'support': 'support@7dimensions.eu',
     'maintainer': '7Dimensions',
