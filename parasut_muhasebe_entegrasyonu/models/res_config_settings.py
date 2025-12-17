@@ -500,59 +500,72 @@ class ResConfigSettings(models.TransientModel):
 
     def action_sync_salaries(self):
         """ Sync Salaries as Journal Entries (Maaş Kayıtları) """
-        # Only fetch Bills that are identified as SALARY
-        params = {'include': 'details,supplier,category', 'sort': '-issue_date'}
-        try:
-            batches = self._fetch_from_parasut('purchase_bills', params=params)
-        except:
-             batches = self._fetch_from_parasut('purchase_bills', params={'include': 'details,supplier', 'sort': '-issue_date'})
-        
+        params = {'include': 'employee', 'sort': '-id'}
+        batches = self._fetch_from_parasut('salaries', params=params)
         Move = self.env['account.move']
-        Partner = self.env['res.partner']
+        Employee = self.env['hr.employee']
         Journal = self.env['account.journal']
         
         processed = 0
+        
+        # Find or create general journal
         general_journal = Journal.search([('type', '=', 'general')], limit=1)
         if not general_journal:
-             return self._return_notification("Hata", "Genel yevmiye defteri bulunamadı.")
+            return self._return_notification("Hata", "Genel yevmiye defteri bulunamadı.")
         
         for batch in batches:
             for item in batch['data']:
-                # ONLY Process if Salary
-                if self._get_bill_type(item, batch) != 'salary':
-                    continue
-                
-                p_id = item['id']
                 attrs = item['attributes']
+                p_id = item['id']
                 
-                # Check if already exists
+                # Check if exists
                 if Move.search([('ref', 'like', f"MAAS-{p_id}%")], limit=1):
                     continue
                 
-                # Get supplier/employee name
+                # Find Employee
                 employee_name = "Çalışan"
-                if item.get('relationships', {}).get('supplier', {}).get('data'):
-                    supp_id = item['relationships']['supplier']['data']['id']
-                    partner_obj = Partner.search([('parasut_id', '=', supp_id)], limit=1)
-                    if partner_obj:
-                        employee_name = partner_obj.name
+                if item.get('relationships', {}).get('employee', {}).get('data'):
+                    emp_id = item['relationships']['employee']['data']['id']
+                    emp_obj = Employee.search([('parasut_id', '=', emp_id)], limit=1)
+                    if emp_obj:
+                        employee_name = emp_obj.name
                     else:
-                        supp_node = self._find_in_included(batch['included'], 'contacts', supp_id)
-                        if supp_node:
-                            employee_name = supp_node['attributes']['name']
+                        # Try from included
+                        emp_node = self._find_in_included(batch['included'], 'employees', emp_id)
+                        if emp_node:
+                            employee_name = emp_node['attributes']['name']
                 
-                amount = float(attrs.get('net_total') or 0.0)
-                date = attrs.get('issue_date')
+                amount = float(attrs.get('net_total') or attrs.get('amount') or 0.0)
+                date = attrs.get('payment_date') or attrs.get('date')
                 
-                expense_account = self.env['account.account'].search([('code', 'like', '770%'), ('account_type', '=', 'expense')], limit=1)
-                payable_account = self.env['account.account'].search([('code', 'like', '335%'), ('account_type', '=', 'liability_payable')], limit=1)
+                # Create Journal Entry
+                # Debit: Salary Expense, Credit: Payable to Employee
+                expense_account = self.env['account.account'].search([
+                    ('code', 'like', '770%'),
+                    ('account_type', '=', 'expense')
+                ], limit=1)
+                
+                payable_account = self.env['account.account'].search([
+                    ('code', 'like', '335%'),
+                    ('account_type', '=', 'liability_payable')
+                ], limit=1)
                 
                 if not expense_account or not payable_account:
                     continue
                 
                 move_lines = [
-                    (0, 0, {'account_id': expense_account.id, 'name': f"Maaş: {employee_name}", 'debit': amount, 'credit': 0}),
-                    (0, 0, {'account_id': payable_account.id, 'name': f"Maaş: {employee_name}", 'debit': 0, 'credit': amount})
+                    (0, 0, {
+                        'account_id': expense_account.id,
+                        'name': f"Maaş: {employee_name}",
+                        'debit': amount,
+                        'credit': 0,
+                    }),
+                    (0, 0, {
+                        'account_id': payable_account.id,
+                        'name': f"Maaş: {employee_name}",
+                        'debit': 0,
+                        'credit': amount,
+                    })
                 ]
                 
                 move_vals = {
@@ -562,54 +575,68 @@ class ResConfigSettings(models.TransientModel):
                     'ref': f"MAAS-{p_id} ({employee_name})",
                     'line_ids': move_lines,
                 }
-                Move.create(move_vals).action_post()
+                
+                move = Move.create(move_vals)
+                move.action_post()
                 processed += 1
         
         return self._return_notification("Salaries Synced", f"{processed} salary entries created.")
 
     def action_sync_taxes(self):
         """ Sync Tax Payments as Journal Entries (Vergi Ödemeleri) """
-        # Only fetch Bills that are identified as TAX
-        params = {'include': 'details,supplier,category', 'sort': '-issue_date'}
-        try:
-            batches = self._fetch_from_parasut('purchase_bills', params=params)
-        except:
-             batches = self._fetch_from_parasut('purchase_bills', params={'include': 'details,supplier', 'sort': '-issue_date'})
-        
+        params = {'sort': '-id'}
+        batches = self._fetch_from_parasut('taxes', params=params)
         Move = self.env['account.move']
         Journal = self.env['account.journal']
         
         processed = 0
+        
+        # Find or create general journal
         general_journal = Journal.search([('type', '=', 'general')], limit=1)
         if not general_journal:
             return self._return_notification("Hata", "Genel yevmiye defteri bulunamadı.")
         
         for batch in batches:
             for item in batch['data']:
-                # ONLY Process if Tax
-                if self._get_bill_type(item, batch) != 'tax':
-                    continue
-                
-                p_id = item['id']
                 attrs = item['attributes']
+                p_id = item['id']
                 
                 # Check if exists
                 if Move.search([('ref', 'like', f"VERGI-{p_id}%")], limit=1):
                     continue
                 
-                tax_name = attrs.get('description') or "Vergi Ödemesi"
-                amount = float(attrs.get('net_total') or 0.0)
-                date = attrs.get('issue_date')
+                tax_name = attrs.get('name') or "Vergi Ödemesi"
+                amount = float(attrs.get('amount') or 0.0)
+                date = attrs.get('payment_date') or attrs.get('date')
                 
-                expense_account = self.env['account.account'].search([('code', 'like', '770%'), ('account_type', '=', 'expense')], limit=1)
-                payable_account = self.env['account.account'].search([('code', 'like', '360%'), ('account_type', '=', 'liability_current')], limit=1)
+                # Create Journal Entry
+                # Debit: Tax Expense, Credit: Tax Payable
+                expense_account = self.env['account.account'].search([
+                    ('code', 'like', '770%'),
+                    ('account_type', '=', 'expense')
+                ], limit=1)
+                
+                payable_account = self.env['account.account'].search([
+                    ('code', 'like', '360%'),
+                    ('account_type', '=', 'liability_current')
+                ], limit=1)
                 
                 if not expense_account or not payable_account:
                     continue
                 
                 move_lines = [
-                    (0, 0, {'account_id': expense_account.id, 'name': f"Vergi: {tax_name}", 'debit': amount, 'credit': 0}),
-                    (0, 0, {'account_id': payable_account.id, 'name': f"Vergi: {tax_name}", 'debit': 0, 'credit': amount})
+                    (0, 0, {
+                        'account_id': expense_account.id,
+                        'name': f"Vergi: {tax_name}",
+                        'debit': amount,
+                        'credit': 0,
+                    }),
+                    (0, 0, {
+                        'account_id': payable_account.id,
+                        'name': f"Vergi: {tax_name}",
+                        'debit': 0,
+                        'credit': amount,
+                    })
                 ]
                 
                 move_vals = {
@@ -619,42 +646,17 @@ class ResConfigSettings(models.TransientModel):
                     'ref': f"VERGI-{p_id} ({tax_name})",
                     'line_ids': move_lines,
                 }
-                Move.create(move_vals).action_post()
+                
+                move = Move.create(move_vals)
+                move.action_post()
                 processed += 1
         
         return self._return_notification("Taxes Synced", f"{processed} tax entries created.")
 
-
-    def _get_bill_type(self, item, batch):
-        """ Helper to determine if a bill is regular, salary, or tax based on description/category """
-        attrs = item['attributes']
-        description = (attrs.get('description') or '').lower()
-        item_type = (attrs.get('item_type') or '').lower()
-        category_name = ''
-        
-        # Try to get category from relationships
-        if item.get('relationships', {}).get('category', {}).get('data'):
-            cat_id = item['relationships']['category']['data']['id']
-            cat_node = self._find_in_included(batch['included'], 'item_categories', cat_id)
-            if cat_node:
-                category_name = (cat_node['attributes'].get('name') or '').lower()
-                
-        # Check Keywords
-        # 1. Salary
-        if any(keyword in description or keyword in item_type or keyword in category_name 
-               for keyword in ['maaş', 'maas', 'salary', 'ücret', 'personel']):
-            return 'salary'
-            
-        # 2. Tax
-        if any(keyword in description or keyword in item_type or keyword in category_name 
-               for keyword in ['vergi', 'kdv', 'sgk', 'stopaj', 'tax', 'prim']):
-            return 'tax'
-            
-        return 'bill'
-
     def action_sync_purchase_bills(self):
-        """ Sync Purchase Bills (Gider Faturaları) - EXCLUDING Salary and Tax """
-        params = {'include': 'details,supplier,category', 'sort': '-issue_date'}
+        """ Sync Purchase Bills (Gider Faturaları) """
+        # Removed filter[date_type] as it was causing 400 Bad Request
+        params = {'include': 'details,supplier', 'sort': '-issue_date'}
         batches = self._fetch_from_parasut('purchase_bills', params=params)
         Move = self.env['account.move']
         Partner = self.env['res.partner']
@@ -663,10 +665,6 @@ class ResConfigSettings(models.TransientModel):
         
         for batch in batches:
             for item in batch['data']:
-                # SKIP if Salary or Tax
-                if self._get_bill_type(item, batch) != 'bill':
-                    continue
-                    
                 attrs = item['attributes']
                 p_id = item['id']
                 
