@@ -38,7 +38,6 @@ For questions, issues, or feature requests, please contact us through GitHub.
     'category': 'Accounting/Accounting',
     'author': '7Dimensions',
     'website': 'https://7dimensions.eu',
-    'license': 'LGPL-3',
     'depends': ['account', 'hr'],
     'data': [
         'views/menu_views.xml',
@@ -53,8 +52,11 @@ For questions, issues, or feature requests, please contact us through GitHub.
         'static/description/screenshot_3.png',
     ],
     'installable': True,
-    'application': False,
+    'application': True,
     'auto_install': False,
+    'license': 'OPL-1',
+    'price': 150.00,
+    'currency': 'EUR',
     'support': 'support@7dimensions.eu',
     'maintainer': '7Dimensions',
 }
