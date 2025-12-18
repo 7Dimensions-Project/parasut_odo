@@ -563,21 +563,33 @@ class ResConfigSettings(models.TransientModel):
                         partner = self.env['res.partner'].create({'name': employee_name, 'supplier_rank': 1})
                     partner_id = partner.id
 
-                amount = float(attrs.get('net_total') or attrs.get('amount') or 0.0)
+                # Robust amount detection (checking all potential Paraşüt fields)
+                amount = float(attrs.get('net_total') or attrs.get('amount') or attrs.get('total_paid') or 0.0)
                 date = attrs.get('payment_date') or attrs.get('date') or fields.Date.today()
                 
+                if amount <= 0:
+                    _logger.warning(f"Skipping Salary {p_id} because amount is zero.")
+                    continue
+
                 # Create Journal Entry
+                # Try to find a suitable expense account (starting with 770 or any expense)
                 expense_account = self.env['account.account'].search([
-                    ('code', 'like', '770%'),
+                    ('code', '=like', '770%'),
+                    ('account_type', '=', 'expense')
+                ], limit=1) or self.env['account.account'].search([
                     ('account_type', '=', 'expense')
                 ], limit=1)
                 
+                # Try to find a suitable payable account (starting with 335 or any payable)
                 payable_account = self.env['account.account'].search([
-                    ('code', 'like', '335%'),
+                    ('code', '=like', '335%'),
+                    ('account_type', '=', 'liability_payable')
+                ], limit=1) or self.env['account.account'].search([
                     ('account_type', '=', 'liability_payable')
                 ], limit=1)
                 
                 if not expense_account or not payable_account:
+                    _logger.error(f"Could not find suitable accounts for Salary {p_id}.")
                     continue
                 
                 move_lines = [
@@ -636,9 +648,14 @@ class ResConfigSettings(models.TransientModel):
                     continue
                 
                 tax_name = attrs.get('name') or "Vergi Ödemesi"
-                amount = float(attrs.get('amount') or 0.0)
+                # Robust amount detection
+                amount = float(attrs.get('net_total') or attrs.get('amount') or attrs.get('total_paid') or 0.0)
                 date = attrs.get('payment_date') or attrs.get('date') or fields.Date.today()
                 
+                if amount <= 0:
+                    _logger.warning(f"Skipping Tax {p_id} because amount is zero.")
+                    continue
+
                 # Resolve Partner for Tax (Vergi Dairesi / SGK)
                 partner_name = "Vergi Dairesi / SGK"
                 tax_partner = self.env['res.partner'].search([('name', '=', partner_name)], limit=1)
@@ -647,16 +664,21 @@ class ResConfigSettings(models.TransientModel):
                 
                 # Create Journal Entry
                 expense_account = self.env['account.account'].search([
-                    ('code', 'like', '770%'),
+                    ('code', '=like', '770%'),
+                    ('account_type', '=', 'expense')
+                ], limit=1) or self.env['account.account'].search([
                     ('account_type', '=', 'expense')
                 ], limit=1)
                 
                 payable_account = self.env['account.account'].search([
-                    ('code', 'like', '360%'),
+                    ('code', '=like', '360%'),
                     ('account_type', '=', 'liability_current')
+                ], limit=1) or self.env['account.account'].search([
+                    ('account_type', 'in', ['liability_current', 'liability_payable'])
                 ], limit=1)
                 
                 if not expense_account or not payable_account:
+                    _logger.error(f"Could not find suitable accounts for Tax {p_id}.")
                     continue
                 
                 move_lines = [
