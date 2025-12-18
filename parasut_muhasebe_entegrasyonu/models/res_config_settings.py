@@ -370,9 +370,9 @@ class ResConfigSettings(models.TransientModel):
                     'move_type': 'out_invoice',
                     'parasut_id': p_id,
                     'partner_id': partner_id,
-                    'invoice_date': attrs.get('issue_date'),
-                    'date': attrs.get('issue_date'),
-                    'invoice_date_due': attrs.get('due_date'),
+                    'invoice_date': attrs.get('issue_date') or fields.Date.today(),
+                    'date': attrs.get('issue_date') or fields.Date.today(),
+                    'invoice_date_due': attrs.get('due_date') or attrs.get('issue_date') or fields.Date.today(),
                     'ref': f"SLS-{p_id}",
                     'invoice_line_ids': invoice_lines,
                 }
@@ -564,7 +564,7 @@ class ResConfigSettings(models.TransientModel):
                     partner_id = partner.id
 
                 amount = float(attrs.get('net_total') or attrs.get('amount') or 0.0)
-                date = attrs.get('payment_date') or attrs.get('date')
+                date = attrs.get('payment_date') or attrs.get('date') or fields.Date.today()
                 
                 # Create Journal Entry
                 expense_account = self.env['account.account'].search([
@@ -637,7 +637,7 @@ class ResConfigSettings(models.TransientModel):
                 
                 tax_name = attrs.get('name') or "Vergi Ödemesi"
                 amount = float(attrs.get('amount') or 0.0)
-                date = attrs.get('payment_date') or attrs.get('date')
+                date = attrs.get('payment_date') or attrs.get('date') or fields.Date.today()
                 
                 # Resolve Partner for Tax (Vergi Dairesi / SGK)
                 partner_name = "Vergi Dairesi / SGK"
@@ -771,9 +771,9 @@ class ResConfigSettings(models.TransientModel):
                     'move_type': 'in_invoice',
                     'parasut_id': p_id,
                     'partner_id': partner_id,
-                    'invoice_date': attrs.get('issue_date'),
-                    'date': attrs.get('issue_date'),
-                    'invoice_date_due': attrs.get('due_date'),
+                    'invoice_date': attrs.get('issue_date') or fields.Date.today(),
+                    'date': attrs.get('issue_date') or fields.Date.today(),
+                    'invoice_date_due': attrs.get('due_date') or attrs.get('issue_date') or fields.Date.today(),
                     'ref': f"PRS-{p_id}",
                     'invoice_line_ids': invoice_lines,
                 }
