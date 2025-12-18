@@ -338,12 +338,23 @@ class ResConfigSettings(models.TransientModel):
                             'price_unit': float(d_attrs.get('unit_price', 0.0)),
                         }
                         
-                        # Try to match product if product_id exists in relationships
+                        # Try to match product
                         if det_node.get('relationships', {}).get('product', {}).get('data'):
                             prod_id = det_node['relationships']['product']['data']['id']
                             product = Product.search([('parasut_id', '=', prod_id)], limit=1)
                             if product:
                                 line_vals['product_id'] = product.product_variant_id.id
+
+                        # VAT Rate
+                        vat_rate = d_attrs.get('vat_rate')
+                        if vat_rate:
+                            tax = self.env['account.tax'].search([
+                                ('amount', '=', float(vat_rate)),
+                                ('type_tax_use', '=', 'sale'),
+                                ('price_include', '=', False)
+                            ], limit=1)
+                            if tax:
+                                line_vals['tax_ids'] = [(6, 0, [tax.id])]
                         
                         invoice_lines.append((0, 0, line_vals))
                 
@@ -519,27 +530,43 @@ class ResConfigSettings(models.TransientModel):
                 p_id = item['id']
                 
                 # Check if exists
-                if Move.search([('ref', 'like', f"MAAS-{p_id}%")], limit=1):
+                if Move.search([('parasut_id', '=', p_id), ('ref', 'like', 'MAAS-%')], limit=1):
                     continue
                 
-                # Find Employee
+                # Find Employee and associated Partner
                 employee_name = "Çalışan"
+                partner_id = False
                 if item.get('relationships', {}).get('employee', {}).get('data'):
                     emp_id = item['relationships']['employee']['data']['id']
                     emp_obj = Employee.search([('parasut_id', '=', emp_id)], limit=1)
                     if emp_obj:
                         employee_name = emp_obj.name
+                        # Link to employee's partner if available, otherwise find/create by name
+                        partner = emp_obj.address_home_id or self.env['res.partner'].search([('name', '=', employee_name)], limit=1)
+                        if not partner:
+                            partner = self.env['res.partner'].create({'name': employee_name, 'supplier_rank': 1})
+                        partner_id = partner.id
                     else:
                         # Try from included
                         emp_node = self._find_in_included(batch['included'], 'employees', emp_id)
                         if emp_node:
                             employee_name = emp_node['attributes']['name']
+                            partner = self.env['res.partner'].search([('name', '=', employee_name)], limit=1)
+                            if not partner:
+                                partner = self.env['res.partner'].create({'name': employee_name, 'supplier_rank': 1})
+                            partner_id = partner.id
                 
+                if not partner_id:
+                    # Fallback for "Vergi/SGK" or unknown employees
+                    partner = self.env['res.partner'].search([('name', '=', employee_name)], limit=1)
+                    if not partner:
+                        partner = self.env['res.partner'].create({'name': employee_name, 'supplier_rank': 1})
+                    partner_id = partner.id
+
                 amount = float(attrs.get('net_total') or attrs.get('amount') or 0.0)
                 date = attrs.get('payment_date') or attrs.get('date')
                 
                 # Create Journal Entry
-                # Debit: Salary Expense, Credit: Payable to Employee
                 expense_account = self.env['account.account'].search([
                     ('code', 'like', '770%'),
                     ('account_type', '=', 'expense')
@@ -556,12 +583,14 @@ class ResConfigSettings(models.TransientModel):
                 move_lines = [
                     (0, 0, {
                         'account_id': expense_account.id,
+                        'partner_id': partner_id,
                         'name': f"Maaş: {employee_name}",
                         'debit': amount,
                         'credit': 0,
                     }),
                     (0, 0, {
                         'account_id': payable_account.id,
+                        'partner_id': partner_id,
                         'name': f"Maaş: {employee_name}",
                         'debit': 0,
                         'credit': amount,
@@ -570,6 +599,7 @@ class ResConfigSettings(models.TransientModel):
                 
                 move_vals = {
                     'move_type': 'entry',
+                    'parasut_id': p_id,
                     'journal_id': general_journal.id,
                     'date': date,
                     'ref': f"MAAS-{p_id} ({employee_name})",
@@ -602,15 +632,20 @@ class ResConfigSettings(models.TransientModel):
                 p_id = item['id']
                 
                 # Check if exists
-                if Move.search([('ref', 'like', f"VERGI-{p_id}%")], limit=1):
+                if Move.search([('parasut_id', '=', p_id), ('ref', 'like', 'VERGI-%')], limit=1):
                     continue
                 
                 tax_name = attrs.get('name') or "Vergi Ödemesi"
                 amount = float(attrs.get('amount') or 0.0)
                 date = attrs.get('payment_date') or attrs.get('date')
                 
+                # Resolve Partner for Tax (Vergi Dairesi / SGK)
+                partner_name = "Vergi Dairesi / SGK"
+                tax_partner = self.env['res.partner'].search([('name', '=', partner_name)], limit=1)
+                if not tax_partner:
+                    tax_partner = self.env['res.partner'].create({'name': partner_name, 'supplier_rank': 1})
+                
                 # Create Journal Entry
-                # Debit: Tax Expense, Credit: Tax Payable
                 expense_account = self.env['account.account'].search([
                     ('code', 'like', '770%'),
                     ('account_type', '=', 'expense')
@@ -627,12 +662,14 @@ class ResConfigSettings(models.TransientModel):
                 move_lines = [
                     (0, 0, {
                         'account_id': expense_account.id,
+                        'partner_id': tax_partner.id,
                         'name': f"Vergi: {tax_name}",
                         'debit': amount,
                         'credit': 0,
                     }),
                     (0, 0, {
                         'account_id': payable_account.id,
+                        'partner_id': tax_partner.id,
                         'name': f"Vergi: {tax_name}",
                         'debit': 0,
                         'credit': amount,
@@ -641,6 +678,7 @@ class ResConfigSettings(models.TransientModel):
                 
                 move_vals = {
                     'move_type': 'entry',
+                    'parasut_id': p_id,
                     'journal_id': general_journal.id,
                     'date': date,
                     'ref': f"VERGI-{p_id} ({tax_name})",
@@ -704,15 +742,30 @@ class ResConfigSettings(models.TransientModel):
                             'quantity': float(d_attrs.get('quantity', 1.0)),
                             'price_unit': float(d_attrs.get('unit_price', 0.0)),
                         }
+                        
+                        # VAT Rate
+                        vat_rate = d_attrs.get('vat_rate')
+                        if vat_rate:
+                            tax = self.env['account.tax'].search([
+                                ('amount', '=', float(vat_rate)),
+                                ('type_tax_use', '=', 'purchase'),
+                                ('price_include', '=', False)
+                            ], limit=1)
+                            if tax:
+                                line_vals['tax_ids'] = [(6, 0, [tax.id])]
+
                         invoice_lines.append((0, 0, line_vals))
                 
                 # Fallback line
                 if not invoice_lines:
-                     invoice_lines.append((0, 0, {
+                     line_vals = {
                          'name': attrs.get('description', 'Bill'),
                          'quantity': 1,
                          'price_unit': float(attrs.get('net_total', 0)),
-                     }))
+                     }
+                     # Paraşüt doesn't always provide VAT on header, usually it's in details.
+                     # But if we have no details, we just assume no tax or use a default if needed.
+                     invoice_lines.append((0, 0, line_vals))
 
                 move_vals = {
                     'move_type': 'in_invoice',
@@ -732,21 +785,21 @@ class ResConfigSettings(models.TransientModel):
         return self._return_notification("Bills Synced", f"{processed} bills created.")
 
     def action_sync_payments(self):
-        """ Sync Payments (Smart Mode: Open Invoices First) """
+        """ Sync Payments (Smart Mode: Supporting Bills, Salaries, and Taxes) """
         Move = self.env['account.move']
         Journal = self.env['account.journal']
         PaymentRegister = self.env['account.payment.register']
         
-        # 1. Find Open Invoices in Odoo (That have Parasut ID)
-        open_invoices = Move.search([
-            ('move_type', '=', 'in_invoice'),
+        # 1. Find Open Payables in Odoo
+        open_payables = Move.search([
+            ('move_type', 'in', ['in_invoice', 'entry']),
             ('state', '=', 'posted'),
-            ('payment_state', '!=', 'paid'),
+            ('payment_state', 'in', ['not_paid', 'partial']),
             ('parasut_id', '!=', False)
-        ], limit=50) # Limit to 50 to prevent timeouts/blocks per run
+        ], limit=50)
 
-        if not open_invoices:
-             return self._return_notification("Odoo Güncel", "Ödenmemiş ve Paraşüt ID'si olan fatura bulunamadı.")
+        if not open_payables:
+             return self._return_notification("Odoo Güncel", "Ödenmemiş borç kaydı bulunamadı.")
 
         headers = self._get_parasut_headers()
         base_url = "https://api.parasut.com/v4"
@@ -754,18 +807,24 @@ class ResConfigSettings(models.TransientModel):
 
         processed_count = 0
         
-        for invoice in open_invoices:
+        for move in open_payables:
             try:
-                # Rate Limit Protection
                 time.sleep(0.5) 
                 
-                # Fetch Bill with Payments
-                url = f"{base_url}/{company_id}/purchase_bills/{invoice.parasut_id}"
+                # Determine Endpoint
+                endpoint = "purchase_bills"
+                if move.ref and move.ref.startswith('MAAS-'):
+                    endpoint = "salaries"
+                elif move.ref and move.ref.startswith('VERGI-'):
+                    endpoint = "taxes"
+                
+                # Fetch Record with Payments
+                url = f"{base_url}/{company_id}/{endpoint}/{move.parasut_id}"
                 params = {'include': 'payments'} 
                 
                 response = requests.get(url, headers=headers, params=params, timeout=10)
                 if response.status_code == 429:
-                    return self._return_notification("Rate Limit Hit", f"Processed {processed_count} invoices. Please wait a minute and try again.")
+                    return self._return_notification("Rate Limit Hit", f"Processed {processed_count} records. Please retry.")
                 if response.status_code != 200:
                     continue
 
@@ -791,7 +850,7 @@ class ResConfigSettings(models.TransientModel):
                     
                     journal_id = False
                     
-                    # 1. Try account relationship
+                    # 1. Try account relationship (most common for bank/cash)
                     acc_rel = payment_obj.get('relationships', {}).get('account', {}).get('data') 
                     
                     if not acc_rel:
@@ -827,23 +886,23 @@ class ResConfigSettings(models.TransientModel):
                     try:
                         ctx = {
                             'active_model': 'account.move',
-                            'active_ids': [invoice.id],
+                            'active_ids': [move.id],
                         }
                         register = PaymentRegister.with_context(ctx).create({
                             'amount': amount,
                             'payment_date': p_date,
                             'journal_id': journal_id,
-                            'communication': f"Fatura: {invoice.name} - Ödeme: {p_id}",
+                            'communication': f"{move.ref} - Ödeme: {p_id}",
                         })
                         register.action_create_payments()
                     except Exception as e:
-                        _logger.error(f"Error creating payment for invoice {invoice.id}: {e}")
+                        _logger.error(f"Error creating payment for record {move.id}: {e}")
             except Exception as e:
-                _logger.error(f"Error processing invoice {invoice.id}: {e}")
+                _logger.error(f"Error processing record {move.id}: {e}")
             
             processed_count += 1
 
-        return self._return_notification("Kontrol Edildi", f"{processed_count} adet açık fatura için ödemeler kontrol edildi.")
+        return self._return_notification("Kontrol Edildi", f"{processed_count} adet borç kaydı için ödemeler senkronize edildi.")
 
     def _return_notification(self, title, message):
          return {
