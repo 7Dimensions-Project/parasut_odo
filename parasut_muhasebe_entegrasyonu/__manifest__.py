@@ -34,6 +34,8 @@ Configuration:
 Support:
 --------
 For questions, issues, or feature requests, please contact us through GitHub.
+
+**Version:** 19.0.1.1.1
     """,
     'category': 'Accounting/Accounting',
     'author': '7Dimensions',
