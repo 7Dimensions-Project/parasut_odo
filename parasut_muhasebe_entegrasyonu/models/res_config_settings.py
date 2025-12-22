@@ -760,7 +760,7 @@ class ResConfigSettings(models.TransientModel):
                     if det_node:
                         d_attrs = det_node['attributes']
                         line_vals = {
-                            'name': d_attrs.get('name') or attrs.get('description') or 'Purchase Line',
+                            'name': d_attrs.get('description') or d_attrs.get('name') or attrs.get('description') or 'Purchase Line',
                             'quantity': float(d_attrs.get('quantity', 1.0)),
                             'price_unit': float(d_attrs.get('unit_price', 0.0)),
                         }
