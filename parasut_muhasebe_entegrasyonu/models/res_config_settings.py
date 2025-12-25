@@ -720,6 +720,7 @@ class ResConfigSettings(models.TransientModel):
         batches = self._fetch_from_parasut('purchase_bills', params=params)
         Move = self.env['account.move']
         Partner = self.env['res.partner']
+        Product = self.env['product.template']
         
         processed = 0
         
@@ -760,10 +761,22 @@ class ResConfigSettings(models.TransientModel):
                     if det_node:
                         d_attrs = det_node['attributes']
                         line_vals = {
-                            'name': d_attrs.get('description') or d_attrs.get('name') or attrs.get('description') or 'Purchase Line',
                             'quantity': float(d_attrs.get('quantity', 1.0)),
                             'price_unit': float(d_attrs.get('unit_price', 0.0)),
                         }
+
+                        # Try to match product
+                        product_name = False
+                        if det_node.get('relationships', {}).get('product', {}).get('data'):
+                            prod_id = det_node['relationships']['product']['data']['id']
+                            product = Product.search([('parasut_id', '=', prod_id)], limit=1)
+                            if product:
+                                line_vals['product_id'] = product.product_variant_id.id
+                                product_name = product.name
+                        
+                        # Name Logic: Detail Desc > Detail Name > Product Name > invoice Desc
+                        fname = d_attrs.get('description') or d_attrs.get('name') or product_name or attrs.get('description') or 'Purchase Line'
+                        line_vals['name'] = fname
                         
                         # VAT Rate
                         vat_rate = d_attrs.get('vat_rate')
