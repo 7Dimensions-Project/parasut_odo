@@ -730,8 +730,8 @@ class ResConfigSettings(models.TransientModel):
                 p_id = item['id']
                 
                 # Check exist
-                if Move.search([('parasut_id', '=', p_id), ('move_type', '=', 'in_invoice')], limit=1):
-                    continue
+                existing_move = Move.search([('parasut_id', '=', p_id), ('move_type', '=', 'in_invoice')], limit=1)
+                # Removed 'continue' to allow updates
                 
                 # Resolve Partner
                 partner_id = False
@@ -813,11 +813,25 @@ class ResConfigSettings(models.TransientModel):
                     'invoice_line_ids': invoice_lines,
                 }
                 
-                move = Move.create(move_vals)
-                move.action_post()
+                if existing_move:
+                    # UPDATE
+                    if existing_move.state == 'posted':
+                        existing_move.button_draft()
+                    
+                    # Clear existing lines to prevent duplication
+                    move_vals['invoice_line_ids'].insert(0, (5, 0, 0))
+                    
+                    existing_move.write(move_vals)
+                    existing_move.action_post()
+                    # processed += 1 # Count updates as processed too
+                else:
+                    # CREATE
+                    move = Move.create(move_vals)
+                    move.action_post()
+                
                 processed += 1
         
-        return self._return_notification("Bills Synced", f"{processed} bills created.")
+        return self._return_notification("Bills Synced", f"{processed} bills processed (created/updated).")
 
     def action_sync_payments(self):
         """ Sync Payments (Smart Mode: Supporting Bills, Salaries, and Taxes) """
