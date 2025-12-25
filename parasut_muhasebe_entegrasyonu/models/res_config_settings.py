@@ -767,16 +767,30 @@ class ResConfigSettings(models.TransientModel):
 
                         # Try to match product
                         product_name = False
-                        if det_node.get('relationships', {}).get('product', {}).get('data'):
+                        
+                        # Check for product_name directly in detail attributes (some APIs provide this)
+                        product_name = d_attrs.get('product_name') or d_attrs.get('item_name') or d_attrs.get('service_name')
+                        
+                        if not product_name and det_node.get('relationships', {}).get('product', {}).get('data'):
                             prod_id = det_node['relationships']['product']['data']['id']
+                            prod_type = det_node['relationships']['product']['data'].get('type', 'products')
                             
-                            # 1. Try to find name from INCLUDED data (API Response)
-                            # This guarantees name is found if Parasut sent it
-                            prod_node = self._find_in_included(batch['included'], 'products', prod_id)
+                            # 1. Try to find name from INCLUDED data using the type from relationship
+                            prod_node = self._find_in_included(batch['included'], prod_type, prod_id)
+                            
+                            # 2. Fallback: try 'products' (plural)
+                            if not prod_node:
+                                prod_node = self._find_in_included(batch['included'], 'products', prod_id)
+                            
+                            # 3. Fallback: try 'product' (singular)
+                            if not prod_node:
+                                prod_node = self._find_in_included(batch['included'], 'product', prod_id)
+                            
                             if prod_node:
-                                product_name = prod_node['attributes']['name']
+                                p_attrs = prod_node.get('attributes', {})
+                                product_name = p_attrs.get('name') or p_attrs.get('title') or p_attrs.get('product_name')
 
-                            # 2. Try to link to Odoo Product
+                            # 4. Try to link to Odoo Product
                             product = Product.search([('parasut_id', '=', prod_id)], limit=1)
                             if product:
                                 line_vals['product_id'] = product.product_variant_id.id
