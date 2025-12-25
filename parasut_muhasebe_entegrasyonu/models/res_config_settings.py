@@ -137,6 +137,57 @@ class ResConfigSettings(models.TransientModel):
                 return inc
         return None
 
+    def _parse_purchase_bill_detail(self, det_node, included, invoice_attrs):
+        """Parse a purchase bill detail node into Odoo line values.
+        Returns a dict suitable for (0, 0, line_vals).
+        """
+        d_attrs = det_node.get('attributes', {})
+        line_vals = {
+            'quantity': float(d_attrs.get('quantity', 1.0)),
+            'price_unit': float(d_attrs.get('unit_price', 0.0)),
+        }
+        # Direct product name fields from detail
+        product_name = d_attrs.get('product_name') or d_attrs.get('item_name') or d_attrs.get('service_name')
+        # Relationship based product lookup
+        if not product_name and det_node.get('relationships', {}).get('product', {}).get('data'):
+            rel_data = det_node['relationships']['product']['data']
+            prod_id = rel_data['id']
+            prod_type = rel_data.get('type', 'products')
+            # Try various type names in included
+            prod_node = self._find_in_included(included, prod_type, prod_id)
+            if not prod_node:
+                prod_node = self._find_in_included(included, 'products', prod_id)
+            if not prod_node:
+                prod_node = self._find_in_included(included, 'product', prod_id)
+            if prod_node:
+                p_attrs = prod_node.get('attributes', {})
+                product_name = p_attrs.get('name') or p_attrs.get('title') or p_attrs.get('product_name')
+            # Link to Odoo product if exists
+            product = self.env['product.template'].search([('parasut_id', '=', prod_id)], limit=1)
+            if product:
+                line_vals['product_id'] = product.product_variant_id.id
+                if not product_name:
+                    product_name = product.name
+        # Name resolution hierarchy
+        line_vals['name'] = (
+            d_attrs.get('description')
+            or d_attrs.get('name')
+            or product_name
+            or invoice_attrs.get('description')
+            or 'Purchase Line'
+        )
+        # VAT handling
+        vat_rate = d_attrs.get('vat_rate')
+        if vat_rate:
+            tax = self.env['account.tax'].search([
+                ('amount', '=', float(vat_rate)),
+                ('type_tax_use', '=', 'purchase'),
+                ('price_include', '=', False)
+            ], limit=1)
+            if tax:
+                line_vals['tax_ids'] = [(6, 0, [tax.id])]
+        return line_vals
+
     def action_sync_accounts(self):
         """ Sync Bank and Cash Accounts (Kasa/Banka) """
         batches = self._fetch_from_parasut('accounts')
@@ -755,64 +806,11 @@ class ResConfigSettings(models.TransientModel):
                 # Prepare Lines
                 invoice_lines = []
                 details_rels = item.get('relationships', {}).get('details', {}).get('data', [])
-                
-                for det in details_rels:
-                    det_node = self._find_in_included(batch['included'], 'purchase_bill_details', det['id'])
-                    if det_node:
-                        d_attrs = det_node['attributes']
-                        line_vals = {
-                            'quantity': float(d_attrs.get('quantity', 1.0)),
-                            'price_unit': float(d_attrs.get('unit_price', 0.0)),
-                        }
-
-                        # Try to match product
-                        product_name = False
-                        
-                        # Check for product_name directly in detail attributes (some APIs provide this)
-                        product_name = d_attrs.get('product_name') or d_attrs.get('item_name') or d_attrs.get('service_name')
-                        
-                        if not product_name and det_node.get('relationships', {}).get('product', {}).get('data'):
-                            prod_id = det_node['relationships']['product']['data']['id']
-                            prod_type = det_node['relationships']['product']['data'].get('type', 'products')
-                            
-                            # 1. Try to find name from INCLUDED data using the type from relationship
-                            prod_node = self._find_in_included(batch['included'], prod_type, prod_id)
-                            
-                            # 2. Fallback: try 'products' (plural)
-                            if not prod_node:
-                                prod_node = self._find_in_included(batch['included'], 'products', prod_id)
-                            
-                            # 3. Fallback: try 'product' (singular)
-                            if not prod_node:
-                                prod_node = self._find_in_included(batch['included'], 'product', prod_id)
-                            
-                            if prod_node:
-                                p_attrs = prod_node.get('attributes', {})
-                                product_name = p_attrs.get('name') or p_attrs.get('title') or p_attrs.get('product_name')
-
-                            # 4. Try to link to Odoo Product
-                            product = Product.search([('parasut_id', '=', prod_id)], limit=1)
-                            if product:
-                                line_vals['product_id'] = product.product_variant_id.id
-                                if not product_name:
-                                    product_name = product.name
-                        
-                        # Name Logic: Detail Desc > Detail Name > Product Name > invoice Desc
-                        fname = d_attrs.get('description') or d_attrs.get('name') or product_name or attrs.get('description') or 'Purchase Line'
-                        line_vals['name'] = fname
-                        
-                        # VAT Rate
-                        vat_rate = d_attrs.get('vat_rate')
-                        if vat_rate:
-                            tax = self.env['account.tax'].search([
-                                ('amount', '=', float(vat_rate)),
-                                ('type_tax_use', '=', 'purchase'),
-                                ('price_include', '=', False)
-                            ], limit=1)
-                            if tax:
-                                line_vals['tax_ids'] = [(6, 0, [tax.id])]
-
-                        invoice_lines.append((0, 0, line_vals))
+                                for det in details_rels:
+                        det_node = self._find_in_included(batch['included'], 'purchase_bill_details', det['id'])
+                        if det_node:
+                            line_vals = self._parse_purchase_bill_detail(det_node, batch['included'], attrs)
+                            invoice_lines.append((0, 0, line_vals))
                 
                 # Fallback line
                 if not invoice_lines:
