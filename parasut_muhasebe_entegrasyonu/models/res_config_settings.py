@@ -769,10 +769,19 @@ class ResConfigSettings(models.TransientModel):
                         product_name = False
                         if det_node.get('relationships', {}).get('product', {}).get('data'):
                             prod_id = det_node['relationships']['product']['data']['id']
+                            
+                            # 1. Try to find name from INCLUDED data (API Response)
+                            # This guarantees name is found if Parasut sent it
+                            prod_node = self._find_in_included(batch['included'], 'products', prod_id)
+                            if prod_node:
+                                product_name = prod_node['attributes']['name']
+
+                            # 2. Try to link to Odoo Product
                             product = Product.search([('parasut_id', '=', prod_id)], limit=1)
                             if product:
                                 line_vals['product_id'] = product.product_variant_id.id
-                                product_name = product.name
+                                if not product_name:
+                                    product_name = product.name
                         
                         # Name Logic: Detail Desc > Detail Name > Product Name > invoice Desc
                         fname = d_attrs.get('description') or d_attrs.get('name') or product_name or attrs.get('description') or 'Purchase Line'
