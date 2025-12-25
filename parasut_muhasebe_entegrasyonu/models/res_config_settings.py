@@ -716,7 +716,7 @@ class ResConfigSettings(models.TransientModel):
     def action_sync_purchase_bills(self):
         """ Sync Purchase Bills (Gider Faturaları) """
         # Removed filter[date_type] as it was causing 400 Bad Request
-        params = {'include': 'details,supplier', 'sort': '-issue_date'}
+        params = {'include': 'details,details.product,supplier', 'sort': '-issue_date'}
         batches = self._fetch_from_parasut('purchase_bills', params=params)
         Move = self.env['account.move']
         Partner = self.env['res.partner']
