@@ -179,11 +179,22 @@ class ResConfigSettings(models.TransientModel):
         # VAT handling
         vat_rate = d_attrs.get('vat_rate')
         if vat_rate:
+            # Robust tax matching
+            # Strict tax matching: must be Price Excluded and Active
             tax = self.env['account.tax'].search([
                 ('amount', '=', float(vat_rate)),
                 ('type_tax_use', '=', 'purchase'),
-                ('price_include', '=', False)
-            ], limit=1)
+                ('price_include', '=', False),
+                ('active', '=', True)
+            ], order='sequence', limit=1)
+            if not tax:
+                # Fallback: check if 0.20 instead of 20
+                tax = self.env['account.tax'].search([
+                    ('amount', '=', float(vat_rate) / 100.0),
+                    ('type_tax_use', '=', 'purchase'),
+                    ('price_include', '=', False),
+                    ('active', '=', True)
+                ], order='sequence', limit=1)
             if tax:
                 line_vals['tax_ids'] = [(6, 0, [tax.id])]
         return line_vals
@@ -318,8 +329,17 @@ class ResConfigSettings(models.TransientModel):
                     # Try to find matching tax
                     tax = self.env['account.tax'].search([
                         ('amount', '=', float(vat_rate)),
-                        ('type_tax_use', '=', 'sale')
-                    ], limit=1)
+                        ('type_tax_use', '=', 'sale'),
+                        ('price_include', '=', False),
+                        ('active', '=', True)
+                    ], order='sequence', limit=1)
+                    if not tax:
+                        tax = self.env['account.tax'].search([
+                            ('amount', '=', float(vat_rate) / 100.0),
+                            ('type_tax_use', '=', 'sale'),
+                            ('price_include', '=', False),
+                            ('active', '=', True)
+                        ], order='sequence', limit=1)
                     if tax:
                         vals['taxes_id'] = [(6, 0, [tax.id])]
                 
@@ -402,8 +422,17 @@ class ResConfigSettings(models.TransientModel):
                             tax = self.env['account.tax'].search([
                                 ('amount', '=', float(vat_rate)),
                                 ('type_tax_use', '=', 'sale'),
-                                ('price_include', '=', False)
-                            ], limit=1)
+                                ('price_include', '=', False),
+                                ('active', '=', True)
+                            ], order='sequence', limit=1)
+                            if not tax:
+                                # Fallback: check if 0.20 instead of 20
+                                tax = self.env['account.tax'].search([
+                                    ('amount', '=', float(vat_rate) / 100.0),
+                                    ('type_tax_use', '=', 'sale'),
+                                    ('price_include', '=', False),
+                                    ('active', '=', True)
+                                ], order='sequence', limit=1)
                             if tax:
                                 line_vals['tax_ids'] = [(6, 0, [tax.id])]
                         
