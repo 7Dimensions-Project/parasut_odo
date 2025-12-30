@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Connector Form View -->
+        <record id="view_parasut_connector_form" model="ir.ui.view">
+            <field name="name">parasut.connector.form</field>
+            <field name="model">parasut.connector</field>
+            <field name="arch" type="xml">
+                <form string="Parasut Integration Dashboard">
+                    <header>
+                        <button name="action_sync_accounts" string="Sync Accounts" type="object" class="btn-primary" icon="fa-university"/>
+                        <button name="action_sync_contacts" string="Sync Contacts" type="object" class="btn-primary" icon="fa-address-book"/>
+                        <button name="action_sync_products" string="Sync Products" type="object" class="btn-primary" icon="fa-cubes"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>Parasut Synchronization Dashboard</h1>
+                        </div>
+                        <group name="sync_operations">
+                            <group string="Financial Data">
+                                <button name="action_sync_sales_invoices" string="Sync Sales Invoices" type="object" class="btn-success" icon="fa-arrow-up"/>
+                                <button name="action_sync_purchase_bills" string="Sync Purchase Bills" type="object" class="btn-danger" icon="fa-arrow-down"/>
+                            </group>
+                            <group string="Payments">
+                                <button name="action_sync_payments" string="Sync All Payments" type="object" class="btn-warning" icon="fa-credit-card"/>
+                            </group>
+                        </group>
+                        <div class="alert alert-info mt-3" role="alert">
+                            <strong>Note:</strong> Ensure your API credentials are configured in General Settings before starting synchronization.
+                        </div>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action to open the dashboard -->
+        <record id="action_parasut_connector" model="ir.actions.act_window">
+            <field name="name">Parasut Sync Dashboard</field>
+            <field name="res_model">parasut.connector</field>
+            <field name="view_mode">form</field>
+            <field name="target">inline</field>
+        </record>
+    </data>
+</odoo>

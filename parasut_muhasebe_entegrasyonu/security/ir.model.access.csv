@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_parasut_connector_user,parasut.connector.user,model_parasut_connector,account.group_account_user,1,1,1,1
+access_parasut_connector_manager,parasut.connector.manager,model_parasut_connector,account.group_account_manager,1,1,1,1

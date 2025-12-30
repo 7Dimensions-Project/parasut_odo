@@ -6,113 +6,41 @@
         <field name="inherit_id" ref="account.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                 <app data-string="Parasut Integration" string="Parasut Integration" name="parasut_muhasebe_entegrasyonu">
-                    <block title="API Credentials" name="parasut_credentials">
-                        <setting help="These credentials are required to connect with Parasut API. You can find them in your Parasut developer account.">
-                            <div class="row mt16">
-                                <label for="parasut_client_id" class="col-lg-3 o_light_label"/>
-                                <field name="parasut_client_id"/>
-                            </div>
-                            <div class="row mt16">
-                                <label for="parasut_client_secret" class="col-lg-3 o_light_label"/>
-                                <field name="parasut_client_secret"/>
-                            </div>
-                            <div class="row mt16">
-                                <label for="parasut_company_id" class="col-lg-3 o_light_label"/>
-                                <field name="parasut_company_id"/>
-                            </div>
-                        </setting>
-                        <setting help="User credentials for authentication.">
-                            <div class="row mt16">
-                                <label for="parasut_username" class="col-lg-3 o_light_label"/>
-                                <field name="parasut_username"/>
-                            </div>
-                            <div class="row mt16">
-                                <label for="parasut_password" class="col-lg-3 o_light_label"/>
-                                <field name="parasut_password" password="True"/>
+                 <app data-string="Paraşüt Entegrasyonu" string="Paraşüt Entegrasyonu" name="parasut_muhasebe_entegrasyonu">
+                    <block title="API Kimlik Bilgileri" name="parasut_credentials">
+                        <setting title="API Bilgileri" help="Paraşüt API erişimi için gereklidir.">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <label for="parasut_client_id" class="col-lg-3 o_light_label"/>
+                                    <field name="parasut_client_id"/>
+                                </div>
+                                <div class="row">
+                                    <label for="parasut_client_secret" class="col-lg-3 o_light_label"/>
+                                    <field name="parasut_client_secret" password="True"/>
+                                </div>
+                                <div class="row">
+                                    <label for="parasut_company_id" class="col-lg-3 o_light_label"/>
+                                    <field name="parasut_company_id"/>
+                                </div>
                             </div>
                         </setting>
+                        <setting title="Kullanıcı Bilgileri" help="OAuth 2.0 kimlik doğrulaması için.">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <label for="parasut_username" class="col-lg-3 o_light_label"/>
+                                    <field name="parasut_username"/>
+                                </div>
+                                <div class="row">
+                                    <label for="parasut_password" class="col-lg-3 o_light_label"/>
+                                    <field name="parasut_password" password="True"/>
+                                </div>
+                            </div>
+                        </setting>
+                        
                         <div class="row mt16">
-                            <div class="col-lg-12 o_setting_box">
+                            <div class="col-lg-12">
                                 <button name="action_test_parasut_connection" string="Bağlantıyı Test Et" type="object" class="btn-primary" icon="fa-plug"/>
-                            </div>
-                        </div>
-                        <div class="row mt32">
-                            <div class="col-12">
-                                <h2 class="mb16">
-                                    <i class="fa fa-refresh text-primary"/> Manuel Senkronizasyon
-                                </h2>
-                                <p class="text-muted mb24">Paraşüt verilerinizi Odoo'ya aktarmak için aşağıdaki butonları sırayla kullanın.</p>
-                                
-                                <!-- TEMEL ALTYAPI -->
-                                <div class="alert alert-info mb16" role="alert">
-                                    <h5 class="mb8">
-                                        <i class="fa fa-database"/> 1. Temel Altyapı
-                                    </h5>
-                                    <p class="text-muted small mb8">Önce temel verileri çekin (Hesaplar, Cariler, Ürünler)</p>
-                                    <div class="row">
-                                        <div class="col-md-4 mb8">
-                                            <button name="action_sync_accounts" string="Kasa/Banka Hesapları" type="object" class="btn-info btn-block" icon="fa-university"/>
-                                        </div>
-                                        <div class="col-md-4 mb8">
-                                            <button name="action_sync_contacts" string="Tedarikçi/Müşteriler" type="object" class="btn-info btn-block" icon="fa-address-book"/>
-                                        </div>
-                                        <div class="col-md-4 mb8">
-                                            <button name="action_sync_products" string="Ürünler" type="object" class="btn-info btn-block" icon="fa-cubes"/>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- GİDERLER -->
-                                <div class="alert alert-danger mb16" role="alert">
-                                    <h5 class="mb8">
-                                        <i class="fa fa-arrow-down"/> 2. Giderler (Çıkışlar)
-                                    </h5>
-                                    <p class="text-muted small mb8">Gider faturalarını ve ödemelerini çekin</p>
-                                    <div class="row">
-                                        <div class="col-md-6 mb8">
-                                            <button name="action_sync_purchase_bills" string="Gider Faturaları" type="object" class="btn-danger btn-block" icon="fa-file-text"/>
-                                        </div>
-                                        <div class="col-md-6 mb8">
-                                            <button name="action_sync_payments" string="Gider Ödemelerini Eşleştir" type="object" class="btn-warning btn-block" icon="fa-credit-card"/>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- GELİRLER -->
-                                <div class="alert alert-success mb16" role="alert">
-                                    <h5 class="mb8">
-                                        <i class="fa fa-arrow-up"/> 3. Gelirler (Girişler)
-                                    </h5>
-                                    <p class="text-muted small mb8">Satış faturalarını ve tahsilatları çekin</p>
-                                    <div class="row">
-                                        <div class="col-md-6 mb8">
-                                            <button name="action_sync_sales_invoices" string="Satış Faturaları" type="object" class="btn-success btn-block" icon="fa-file-text-o"/>
-                                        </div>
-                                        <div class="col-md-6 mb8">
-                                            <button name="action_sync_sales_payments" string="Tahsilatları Eşleştir" type="object" class="btn-warning btn-block" icon="fa-money"/>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- PERSONEL VE VERGİLER -->
-                                <div class="alert alert-secondary mb16" role="alert">
-                                    <h5 class="mb8">
-                                        <i class="fa fa-briefcase"/> 4. Personel &amp; Vergiler
-                                    </h5>
-                                    <p class="text-muted small mb8">Çalışan, maaş ve vergi kayıtlarını çekin</p>
-                                    <div class="row">
-                                        <div class="col-md-4 mb8">
-                                            <button name="action_sync_employees" string="Çalışanlar" type="object" class="btn-secondary btn-block" icon="fa-users"/>
-                                        </div>
-                                        <div class="col-md-4 mb8">
-                                            <button name="action_sync_salaries" string="Maaş Kayıtları" type="object" class="btn-secondary btn-block" icon="fa-money"/>
-                                        </div>
-                                        <div class="col-md-4 mb8">
-                                            <button name="action_sync_taxes" string="Vergi Ödemeleri" type="object" class="btn-secondary btn-block" icon="fa-balance-scale"/>
-                                        </div>
-                                    </div>
-                                </div>
+                                <button name="action_parasut_sync_now" string="Senkronizasyon Panelini Aç" type="object" class="btn-secondary ml-2" icon="fa-refresh"/>
                             </div>
                         </div>
                     </block>
