@@ -9,9 +9,9 @@ class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
     parasut_client_id = fields.Char(string='Client ID', config_parameter='parasut.client_id')
-    parasut_client_secret = fields.Char(string='Client Secret', config_parameter='parasut.client_secret', groups='base.group_system')
+    parasut_client_secret = fields.Char(string='Client Secret', config_parameter='parasut.client_secret')
     parasut_username = fields.Char(string='Username', config_parameter='parasut.username')
-    parasut_password = fields.Char(string='Password', config_parameter='parasut.password', groups='base.group_system')
+    parasut_password = fields.Char(string='Password', config_parameter='parasut.password')
     parasut_company_id = fields.Char(string='Company ID', config_parameter='parasut.company_id')
 
     def action_test_parasut_connection(self):
