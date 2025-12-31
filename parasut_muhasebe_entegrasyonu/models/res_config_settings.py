@@ -137,6 +137,43 @@ class ResConfigSettings(models.TransientModel):
                 return inc
         return None
 
+    def _find_odoo_tax(self, vat_rate, type_tax_use):
+        """Robust tax matching helper.
+        Returns: (tax_record or False, is_inclusive boolean)
+        """
+        if not vat_rate:
+            return False, False
+        
+        try:
+            rate = float(vat_rate)
+        except (ValueError, TypeError):
+            return False, False
+
+        # Search for amount matches first (Percent or Decimal)
+        # Prioritize Inclusive then Exclusive
+        # Also filter by matching company if possible
+        domain = [
+            ('amount', 'in', [rate, rate / 100.0]),
+            ('type_tax_use', '=', type_tax_use),
+            ('active', '=', True)
+        ]
+        
+        taxes = self.env['account.tax'].search(domain, order='price_include desc, sequence')
+        if taxes:
+            return taxes[0], taxes[0].price_include
+            
+        # Last resort: search by name (e.g. contains "20")
+        taxes = self.env['account.tax'].search([
+            ('name', 'like', str(int(rate))),
+            ('type_tax_use', '=', type_tax_use),
+            ('active', '=', True)
+        ], order='price_include desc, sequence', limit=1)
+        
+        if taxes:
+            return taxes[0], taxes[0].price_include
+            
+        return False, False
+
     def _parse_purchase_bill_detail(self, det_node, included, invoice_attrs):
         """Parse a purchase bill detail node into Odoo line values.
         Returns a dict suitable for (0, 0, line_vals).
@@ -178,49 +215,11 @@ class ResConfigSettings(models.TransientModel):
         )
         # VAT handling
         vat_rate = d_attrs.get('vat_rate')
-        if vat_rate:
-            # Try to find an inclusive tax first to match Paraşüt visuals (Net + VAT in "Tutar" column)
-            tax = self.env['account.tax'].search([
-                ('amount', '=', float(vat_rate)),
-                ('type_tax_use', '=', 'purchase'),
-                ('price_include', '=', True),
-                ('active', '=', True)
-            ], order='sequence', limit=1)
-            
-            if tax:
-                # Odoo inclusive tax expects price_unit to be the gross amount (Net * 1.VAT)
+        tax, is_inclusive = self._find_odoo_tax(vat_rate, 'purchase')
+        if tax:
+            line_vals['tax_ids'] = [(6, 0, [tax.id])]
+            if is_inclusive:
                 line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
-            else:
-                # Fallback to exclusive tax matching
-                tax = self.env['account.tax'].search([
-                    ('amount', '=', float(vat_rate)),
-                    ('type_tax_use', '=', 'purchase'),
-                    ('price_include', '=', False),
-                    ('active', '=', True)
-                ], order='sequence', limit=1)
-                
-            if not tax:
-                # Fallback: check if 0.20 instead of 20 (Inclusive)
-                tax = self.env['account.tax'].search([
-                    ('amount', '=', float(vat_rate) / 100.0),
-                    ('type_tax_use', '=', 'purchase'),
-                    ('price_include', '=', True),
-                    ('active', '=', True)
-                ], order='sequence', limit=1)
-                if tax:
-                    line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
-
-            if not tax:
-                # Fallback: check if 0.20 instead of 20 (Exclusive)
-                tax = self.env['account.tax'].search([
-                    ('amount', '=', float(vat_rate) / 100.0),
-                    ('type_tax_use', '=', 'purchase'),
-                    ('price_include', '=', False),
-                    ('active', '=', True)
-                ], order='sequence', limit=1)
-
-            if tax:
-                line_vals['tax_ids'] = [(6, 0, [tax.id])]
         return line_vals
 
     def action_sync_accounts(self):
@@ -349,44 +348,9 @@ class ResConfigSettings(models.TransientModel):
                 
                 # VAT Rate
                 vat_rate = attrs.get('vat_rate')
-                if vat_rate:
-                    # Preferred: Price Included Tax
-                    tax = self.env['account.tax'].search([
-                        ('amount', '=', float(vat_rate)),
-                        ('type_tax_use', '=', 'sale'),
-                        ('price_include', '=', True),
-                        ('active', '=', True)
-                    ], order='sequence', limit=1)
-                    
-                    if not tax:
-                        # Fallback: Price Included (0.xx format)
-                        tax = self.env['account.tax'].search([
-                            ('amount', '=', float(vat_rate) / 100.0),
-                            ('type_tax_use', '=', 'sale'),
-                            ('price_include', '=', True),
-                            ('active', '=', True)
-                        ], order='sequence', limit=1)
-                    
-                    if not tax:
-                        # Fallback: Price Excluded (Standard)
-                        tax = self.env['account.tax'].search([
-                            ('amount', '=', float(vat_rate)),
-                            ('type_tax_use', '=', 'sale'),
-                            ('price_include', '=', False),
-                            ('active', '=', True)
-                        ], order='sequence', limit=1)
-                    
-                    if not tax:
-                        # Fallback: Price Excluded (0.xx format)
-                        tax = self.env['account.tax'].search([
-                            ('amount', '=', float(vat_rate) / 100.0),
-                            ('type_tax_use', '=', 'sale'),
-                            ('price_include', '=', False),
-                            ('active', '=', True)
-                        ], order='sequence', limit=1)
-
-                    if tax:
-                        vals['taxes_id'] = [(6, 0, [tax.id])]
+                tax, is_inclusive = self._find_odoo_tax(vat_rate, 'sale')
+                if tax:
+                    vals['taxes_id'] = [(6, 0, [tax.id])]
                 
                 product = Product.search([('parasut_id', '=', p_id)], limit=1)
                 if not product and vals.get('default_code'):
@@ -463,49 +427,11 @@ class ResConfigSettings(models.TransientModel):
 
                         # VAT Rate
                         vat_rate = d_attrs.get('vat_rate')
-                        if vat_rate:
-                            # Preferred: Price Included Tax
-                            tax = self.env['account.tax'].search([
-                                ('amount', '=', float(vat_rate)),
-                                ('type_tax_use', '=', 'sale'),
-                                ('price_include', '=', True),
-                                ('active', '=', True)
-                            ], order='sequence', limit=1)
-                            
-                            if tax:
-                                # Adjust price to be gross
+                        tax, is_inclusive = self._find_odoo_tax(vat_rate, 'sale')
+                        if tax:
+                            line_vals['tax_ids'] = [(6, 0, [tax.id])]
+                            if is_inclusive:
                                 line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
-                            else:
-                                # Fallback: Price Excluded
-                                tax = self.env['account.tax'].search([
-                                    ('amount', '=', float(vat_rate)),
-                                    ('type_tax_use', '=', 'sale'),
-                                    ('price_include', '=', False),
-                                    ('active', '=', True)
-                                ], order='sequence', limit=1)
-                            
-                            if not tax:
-                                # Fallback: Inclusive (0.xx format)
-                                tax = self.env['account.tax'].search([
-                                    ('amount', '=', float(vat_rate) / 100.0),
-                                    ('type_tax_use', '=', 'sale'),
-                                    ('price_include', '=', True),
-                                    ('active', '=', True)
-                                ], order='sequence', limit=1)
-                                if tax:
-                                    line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
-
-                            if not tax:
-                                # Fallback: Exclusive (0.xx format)
-                                tax = self.env['account.tax'].search([
-                                    ('amount', '=', float(vat_rate) / 100.0),
-                                    ('type_tax_use', '=', 'sale'),
-                                    ('price_include', '=', False),
-                                    ('active', '=', True)
-                                ], order='sequence', limit=1)
-
-                            if tax:
-                                line_vals['tax_ids'] = [(6, 0, [tax.id])]
                         
                         invoice_lines.append((0, 0, line_vals))
                 
