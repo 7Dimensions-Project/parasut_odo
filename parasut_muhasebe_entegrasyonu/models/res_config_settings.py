@@ -138,7 +138,7 @@ class ResConfigSettings(models.TransientModel):
         return None
 
     def _find_odoo_tax(self, vat_rate, type_tax_use):
-        """Robust tax matching helper.
+        """Ultra-robust tax matching helper.
         Returns: (tax_record or False, is_inclusive boolean)
         """
         if not vat_rate:
@@ -149,30 +149,40 @@ class ResConfigSettings(models.TransientModel):
         except (ValueError, TypeError):
             return False, False
 
-        # Search for amount matches first (Percent or Decimal)
-        # Prioritize Inclusive then Exclusive
-        # Also filter by matching company if possible
-        domain = [
+        # Order of search:
+        # 1. Exact amount match (Percent or Decimal) in requested usage (Sale/Purchase)
+        # 2. Exact amount match in ANY usage
+        # 3. Name match (contains rate) in ANY usage
+        
+        # Priority 1 & 2: Amount Match
+        amount_matches = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
-            ('type_tax_use', '=', type_tax_use),
             ('active', '=', True)
-        ]
+        ])
         
-        taxes = self.env['account.tax'].search(domain, order='sequence')
-        if taxes:
-            # Sort in Python because price_include might not be stored
-            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
-            return sorted_taxes[0], sorted_taxes[0].price_include
+        if amount_matches:
+            # Sort by: Preferred Usage first, then Inclusive first
+            def sort_key(t):
+                score = 0
+                if t.type_tax_use == type_tax_use: score += 10
+                if t.price_include: score += 5
+                return score
             
-        # Last resort: search by name (e.g. contains "20")
-        taxes = self.env['account.tax'].search([
+            sorted_taxes = amount_matches.sorted(key=sort_key, reverse=True)
+            return sorted_taxes[0], sorted_taxes[0].price_include
+
+        # Priority 3: Name Match
+        name_matches = self.env['account.tax'].search([
             ('name', 'like', str(int(rate))),
-            ('type_tax_use', '=', type_tax_use),
             ('active', '=', True)
-        ], order='sequence')
-        
-        if taxes:
-            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
+        ])
+        if name_matches:
+            def sort_key(t):
+                score = 0
+                if t.type_tax_use == type_tax_use: score += 10
+                if t.price_include: score += 5
+                return score
+            sorted_taxes = name_matches.sorted(key=sort_key, reverse=True)
             return sorted_taxes[0], sorted_taxes[0].price_include
             
         return False, False
@@ -221,8 +231,14 @@ class ResConfigSettings(models.TransientModel):
         tax, is_inclusive = self._find_odoo_tax(vat_rate, 'purchase')
         if tax:
             line_vals['tax_ids'] = [(6, 0, [tax.id])]
+            # Match Paraşüt's visual "Gross" price in lines
+            # Odoo only shows the gross price in the 'Price/Amount' column IF the tax is inclusive.
             if is_inclusive:
                 line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
+            else:
+                # If the tax is NOT inclusive, the user will still see the NET price in the line.
+                # We apply the tax anyway so the TOTAL in the footer is correct.
+                pass
         return line_vals
 
     def action_sync_accounts(self):
@@ -434,6 +450,7 @@ class ResConfigSettings(models.TransientModel):
                         if tax:
                             line_vals['tax_ids'] = [(6, 0, [tax.id])]
                             if is_inclusive:
+                                # Show gross price in the line to match Paraşüt
                                 line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
                         
                         invoice_lines.append((0, 0, line_vals))
