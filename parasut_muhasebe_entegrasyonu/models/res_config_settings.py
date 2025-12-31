@@ -138,10 +138,10 @@ class ResConfigSettings(models.TransientModel):
         return None
 
     def _find_odoo_tax(self, vat_rate, type_tax_use):
-        """Ultra-robust tax matching helper.
+        """Ultra-robust tax matching helper with auto-creation fallback.
         Returns: (tax_record or False, is_inclusive boolean)
         """
-        if not vat_rate:
+        if vat_rate is None:
             return False, False
         
         try:
@@ -149,43 +149,60 @@ class ResConfigSettings(models.TransientModel):
         except (ValueError, TypeError):
             return False, False
 
+        # If rate is 0, we don't need to search
+        if rate == 0:
+            return False, False
+
         # Order of search:
         # 1. Exact amount match (Percent or Decimal) in requested usage (Sale/Purchase)
         # 2. Exact amount match in ANY usage
         # 3. Name match (contains rate) in ANY usage
         
-        # Priority 1 & 2: Amount Match
-        amount_matches = self.env['account.tax'].search([
+        # Priority 1: Exact Amount + Exact Usage
+        taxes = self.env['account.tax'].search([
+            ('amount', 'in', [rate, rate / 100.0]),
+            ('type_tax_use', '=', type_tax_use),
+            ('active', '=', True)
+        ], order='price_include desc, sequence')
+        if taxes:
+            return taxes[0], taxes[0].price_include
+
+        # Priority 2: Exact Amount in ANY Usage (Sale, Purchase, None)
+        taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
             ('active', '=', True)
-        ])
-        
-        if amount_matches:
-            # Sort by: Preferred Usage first, then Inclusive first
-            def sort_key(t):
-                score = 0
-                if t.type_tax_use == type_tax_use: score += 10
-                if t.price_include: score += 5
-                return score
-            
-            sorted_taxes = amount_matches.sorted(key=sort_key, reverse=True)
-            return sorted_taxes[0], sorted_taxes[0].price_include
+        ], order='type_tax_use desc, price_include desc, sequence')
+        if taxes:
+            return taxes[0], taxes[0].price_include
 
-        # Priority 3: Name Match
-        name_matches = self.env['account.tax'].search([
-            ('name', 'like', str(int(rate))),
+        # Priority 3: Name Match ("%20", "20", etc.)
+        search_str = str(int(rate))
+        taxes = self.env['account.tax'].search([
+            ('name', 'ilike', search_str),
             ('active', '=', True)
-        ])
-        if name_matches:
-            def sort_key(t):
-                score = 0
-                if t.type_tax_use == type_tax_use: score += 10
-                if t.price_include: score += 5
-                return score
-            sorted_taxes = name_matches.sorted(key=sort_key, reverse=True)
-            return sorted_taxes[0], sorted_taxes[0].price_include
-            
-        return False, False
+        ], order='price_include desc, sequence')
+        
+        if taxes:
+            best_match = False
+            for t in taxes:
+                if abs(t.amount - rate) < 0.001 or abs(t.amount - (rate/100.0)) < 0.001:
+                    best_match = t
+                    break
+            if best_match:
+                return best_match, best_match.price_include
+
+        # FALLBACK: Create the tax if it doesn't exist to ensure result.
+        # This is what the user meant by "yapmam lazım" (I must do it).
+        tax_name = f"Paraşüt KDV %{int(rate)} (Oto)"
+        new_tax = self.env['account.tax'].create({
+            'name': tax_name,
+            'amount': rate,
+            'type_tax_use': type_tax_use,
+            'amount_type': 'percent',
+            'price_include': True,  # Defaulting to true for visual gross prices
+            'description': f"%{int(rate)}",
+        })
+        return new_tax, True
 
     def _parse_purchase_bill_detail(self, det_node, included, invoice_attrs):
         """Parse a purchase bill detail node into Odoo line values.
