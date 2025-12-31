@@ -906,11 +906,11 @@ class ResConfigSettings(models.TransientModel):
                 # Prepare Lines
                 invoice_lines = []
                 details_rels = item.get('relationships', {}).get('details', {}).get('data', [])
-                                for det in details_rels:
-                        det_node = self._find_in_included(batch['included'], 'purchase_bill_details', det['id'])
-                        if det_node:
-                            line_vals = self._parse_purchase_bill_detail(det_node, batch['included'], attrs)
-                            invoice_lines.append((0, 0, line_vals))
+                for det in details_rels:
+                    det_node = self._find_in_included(batch['included'], 'purchase_bill_details', det['id'])
+                    if det_node:
+                        line_vals = self._parse_purchase_bill_detail(det_node, batch['included'], attrs)
+                        invoice_lines.append((0, 0, line_vals))
                 
                 # Fallback line
                 if not invoice_lines:
