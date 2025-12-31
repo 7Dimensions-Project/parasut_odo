@@ -179,22 +179,46 @@ class ResConfigSettings(models.TransientModel):
         # VAT handling
         vat_rate = d_attrs.get('vat_rate')
         if vat_rate:
-            # Robust tax matching
-            # Strict tax matching: must be Price Excluded and Active
+            # Try to find an inclusive tax first to match Paraşüt visuals (Net + VAT in "Tutar" column)
             tax = self.env['account.tax'].search([
                 ('amount', '=', float(vat_rate)),
                 ('type_tax_use', '=', 'purchase'),
-                ('price_include', '=', False),
+                ('price_include', '=', True),
                 ('active', '=', True)
             ], order='sequence', limit=1)
+            
+            if tax:
+                # Odoo inclusive tax expects price_unit to be the gross amount (Net * 1.VAT)
+                line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
+            else:
+                # Fallback to exclusive tax matching
+                tax = self.env['account.tax'].search([
+                    ('amount', '=', float(vat_rate)),
+                    ('type_tax_use', '=', 'purchase'),
+                    ('price_include', '=', False),
+                    ('active', '=', True)
+                ], order='sequence', limit=1)
+                
             if not tax:
-                # Fallback: check if 0.20 instead of 20
+                # Fallback: check if 0.20 instead of 20 (Inclusive)
+                tax = self.env['account.tax'].search([
+                    ('amount', '=', float(vat_rate) / 100.0),
+                    ('type_tax_use', '=', 'purchase'),
+                    ('price_include', '=', True),
+                    ('active', '=', True)
+                ], order='sequence', limit=1)
+                if tax:
+                    line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
+
+            if not tax:
+                # Fallback: check if 0.20 instead of 20 (Exclusive)
                 tax = self.env['account.tax'].search([
                     ('amount', '=', float(vat_rate) / 100.0),
                     ('type_tax_use', '=', 'purchase'),
                     ('price_include', '=', False),
                     ('active', '=', True)
                 ], order='sequence', limit=1)
+
             if tax:
                 line_vals['tax_ids'] = [(6, 0, [tax.id])]
         return line_vals
@@ -326,20 +350,41 @@ class ResConfigSettings(models.TransientModel):
                 # VAT Rate
                 vat_rate = attrs.get('vat_rate')
                 if vat_rate:
-                    # Try to find matching tax
+                    # Preferred: Price Included Tax
                     tax = self.env['account.tax'].search([
                         ('amount', '=', float(vat_rate)),
                         ('type_tax_use', '=', 'sale'),
-                        ('price_include', '=', False),
+                        ('price_include', '=', True),
                         ('active', '=', True)
                     ], order='sequence', limit=1)
+                    
                     if not tax:
+                        # Fallback: Price Included (0.xx format)
+                        tax = self.env['account.tax'].search([
+                            ('amount', '=', float(vat_rate) / 100.0),
+                            ('type_tax_use', '=', 'sale'),
+                            ('price_include', '=', True),
+                            ('active', '=', True)
+                        ], order='sequence', limit=1)
+                    
+                    if not tax:
+                        # Fallback: Price Excluded (Standard)
+                        tax = self.env['account.tax'].search([
+                            ('amount', '=', float(vat_rate)),
+                            ('type_tax_use', '=', 'sale'),
+                            ('price_include', '=', False),
+                            ('active', '=', True)
+                        ], order='sequence', limit=1)
+                    
+                    if not tax:
+                        # Fallback: Price Excluded (0.xx format)
                         tax = self.env['account.tax'].search([
                             ('amount', '=', float(vat_rate) / 100.0),
                             ('type_tax_use', '=', 'sale'),
                             ('price_include', '=', False),
                             ('active', '=', True)
                         ], order='sequence', limit=1)
+
                     if tax:
                         vals['taxes_id'] = [(6, 0, [tax.id])]
                 
@@ -419,20 +464,46 @@ class ResConfigSettings(models.TransientModel):
                         # VAT Rate
                         vat_rate = d_attrs.get('vat_rate')
                         if vat_rate:
+                            # Preferred: Price Included Tax
                             tax = self.env['account.tax'].search([
                                 ('amount', '=', float(vat_rate)),
                                 ('type_tax_use', '=', 'sale'),
-                                ('price_include', '=', False),
+                                ('price_include', '=', True),
                                 ('active', '=', True)
                             ], order='sequence', limit=1)
+                            
+                            if tax:
+                                # Adjust price to be gross
+                                line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
+                            else:
+                                # Fallback: Price Excluded
+                                tax = self.env['account.tax'].search([
+                                    ('amount', '=', float(vat_rate)),
+                                    ('type_tax_use', '=', 'sale'),
+                                    ('price_include', '=', False),
+                                    ('active', '=', True)
+                                ], order='sequence', limit=1)
+                            
                             if not tax:
-                                # Fallback: check if 0.20 instead of 20
+                                # Fallback: Inclusive (0.xx format)
+                                tax = self.env['account.tax'].search([
+                                    ('amount', '=', float(vat_rate) / 100.0),
+                                    ('type_tax_use', '=', 'sale'),
+                                    ('price_include', '=', True),
+                                    ('active', '=', True)
+                                ], order='sequence', limit=1)
+                                if tax:
+                                    line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
+
+                            if not tax:
+                                # Fallback: Exclusive (0.xx format)
                                 tax = self.env['account.tax'].search([
                                     ('amount', '=', float(vat_rate) / 100.0),
                                     ('type_tax_use', '=', 'sale'),
                                     ('price_include', '=', False),
                                     ('active', '=', True)
                                 ], order='sequence', limit=1)
+
                             if tax:
                                 line_vals['tax_ids'] = [(6, 0, [tax.id])]
                         
