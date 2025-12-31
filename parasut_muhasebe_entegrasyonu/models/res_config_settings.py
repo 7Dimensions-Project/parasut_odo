@@ -163,33 +163,38 @@ class ResConfigSettings(models.TransientModel):
             ('amount', 'in', [rate, rate / 100.0]),
             ('type_tax_use', '=', type_tax_use),
             ('active', '=', True)
-        ], order='price_include desc, sequence')
+        ], order='sequence')
         if taxes:
-            return taxes[0], taxes[0].price_include
+            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
+            return sorted_taxes[0], sorted_taxes[0].price_include
 
         # Priority 2: Exact Amount in ANY Usage (Sale, Purchase, None)
         taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
             ('active', '=', True)
-        ], order='type_tax_use desc, price_include desc, sequence')
+        ], order='type_tax_use desc, sequence')
         if taxes:
-            return taxes[0], taxes[0].price_include
+            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
+            return sorted_taxes[0], sorted_taxes[0].price_include
 
         # Priority 3: Name Match ("%20", "20", etc.)
         search_str = str(int(rate))
         taxes = self.env['account.tax'].search([
             ('name', 'ilike', search_str),
             ('active', '=', True)
-        ], order='price_include desc, sequence')
+        ], order='sequence')
         
         if taxes:
             best_match = False
+            # First, try to find an exact amount match among the name matches
             for t in taxes:
                 if abs(t.amount - rate) < 0.001 or abs(t.amount - (rate/100.0)) < 0.001:
                     best_match = t
                     break
-            if best_match:
-                return best_match, best_match.price_include
+            if not best_match:
+                # If no exact amount match, just pick the first one, prioritizing inclusive
+                best_match = taxes.sorted(key=lambda t: t.price_include, reverse=True)[0]
+            return best_match, best_match.price_include
 
         # FALLBACK: Create the tax if it doesn't exist to ensure result.
         # This is what the user meant by "yapmam lazım" (I must do it).
