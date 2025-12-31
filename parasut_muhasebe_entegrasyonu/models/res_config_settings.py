@@ -158,19 +158,22 @@ class ResConfigSettings(models.TransientModel):
             ('active', '=', True)
         ]
         
-        taxes = self.env['account.tax'].search(domain, order='price_include desc, sequence')
+        taxes = self.env['account.tax'].search(domain, order='sequence')
         if taxes:
-            return taxes[0], taxes[0].price_include
+            # Sort in Python because price_include might not be stored
+            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
+            return sorted_taxes[0], sorted_taxes[0].price_include
             
         # Last resort: search by name (e.g. contains "20")
         taxes = self.env['account.tax'].search([
             ('name', 'like', str(int(rate))),
             ('type_tax_use', '=', type_tax_use),
             ('active', '=', True)
-        ], order='price_include desc, sequence', limit=1)
+        ], order='sequence')
         
         if taxes:
-            return taxes[0], taxes[0].price_include
+            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
+            return sorted_taxes[0], sorted_taxes[0].price_include
             
         return False, False
 
