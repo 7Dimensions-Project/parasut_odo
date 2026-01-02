@@ -263,18 +263,23 @@ class ResConfigSettings(models.TransientModel):
         if tax:
             line_vals['tax_ids'] = [(6, 0, [tax.id])]
             if is_inclusive:
-                # Prioritize 'total' for inclusive taxes
+                # For inclusive, Paraşüt 'total' is the base.
                 val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
                 line_vals['price_unit'] = val_to_use / qty
             else:
-                # Prioritize 'net_total' or 'unit_price' for exclusive taxes
-                # (total - vat_amount) is a fallback if net_total is missing
-                val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else (raw_total - raw_vat))
-                line_vals['price_unit'] = val_to_use / qty
+                # For exclusive, raw 'unit_price' or 'net_total' is the true net base.
+                # Crucial: Avoid using raw_total here because Odoo adds VAT on top of price_unit.
+                if raw_unit > 0:
+                    line_vals['price_unit'] = raw_unit
+                elif raw_net > 0:
+                    line_vals['price_unit'] = raw_net / qty
+                else:
+                    # Last resort: derive net from total
+                    line_vals['price_unit'] = (raw_total - raw_vat) / qty
         else:
-            # No tax: use net_total or unit_price or total
-            val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else raw_total)
-            line_vals['price_unit'] = val_to_use / qty
+            # No tax: total, net, and unit_price should be same.
+            val_to_use = raw_unit if raw_unit > 0 else (raw_net if raw_net > 0 else raw_total)
+            line_vals['price_unit'] = val_to_use if (val_to_use == raw_unit) else (val_to_use / qty)
 
         return line_vals
 
@@ -516,11 +521,15 @@ class ResConfigSettings(models.TransientModel):
                                 val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
                                 line_vals['price_unit'] = val_to_use / qty
                             else:
-                                val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else (raw_total - raw_vat))
-                                line_vals['price_unit'] = val_to_use / qty
+                                if raw_unit > 0:
+                                    line_vals['price_unit'] = raw_unit
+                                elif raw_net > 0:
+                                    line_vals['price_unit'] = raw_net / qty
+                                else:
+                                    line_vals['price_unit'] = (raw_total - raw_vat) / qty
                         else:
-                            val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else raw_total)
-                            line_vals['price_unit'] = val_to_use / qty
+                            val_to_use = raw_unit if raw_unit > 0 else (raw_net if raw_net > 0 else raw_total)
+                            line_vals['price_unit'] = val_to_use if (val_to_use == raw_unit) else (val_to_use / qty)
                         
                         invoice_lines.append((0, 0, line_vals))
                 
