@@ -190,20 +190,53 @@ class ResConfigSettings(models.TransientModel):
         # FINAL SAFETY: Check for exact name collision before creating to avoid uniqueness error
         tax_name = f"Paraşüt KDV %{int(rate)} (Dahil - Oto)"
         existing_by_name = self.env['account.tax'].with_context(active_test=False).search([('name', '=', tax_name)], limit=1)
+        
+        # Prepare Account if possible (Mapping to 191 for Purchases)
+        account_id = False
+        if type_tax_use == 'purchase':
+            account_191 = self.env['account.account'].search([('code', '=ilike', '191%')], limit=1)
+            if account_191:
+                account_id = account_191.id
+
+        # Prepare Tax Group for labeling (Avoid %18 labels on %20 taxes)
+        tax_group_name = f"KDV %{int(rate)}"
+        tax_group = self.env['account.tax.group'].search([('name', '=ilike', tax_group_name)], limit=1)
+        if not tax_group:
+             tax_group = self.env['account.tax.group'].search([('name', 'ilike', 'KDV')], limit=1)
+
         if existing_by_name:
             if not existing_by_name.active:
                 existing_by_name.active = True
+            # Force correct settings even on existing taxes
+            update_vals = {
+                'price_include': True,
+                'include_base_amount': False, # Critical: No "tax on tax"
+            }
+            if tax_group:
+                update_vals['tax_group_id'] = tax_group.id
+            existing_by_name.write(update_vals)
             return existing_by_name[0], True
 
         # FALLBACK: Create the inclusive tax if it doesn't exist.
-        new_tax = self.env['account.tax'].create({
+        create_vals = {
             'name': tax_name,
             'amount': rate,
             'type_tax_use': type_tax_use,
             'amount_type': 'percent',
             'price_include': True,  # Forced to True for user request
+            'include_base_amount': False, # Critical
             'description': f"%{int(rate)} (Dahil)",
-        })
+        }
+        if tax_group:
+             create_vals['tax_group_id'] = tax_group.id
+        
+        if account_id:
+            # In Odoo 17+, we map accounts via invoice_repartition_line_ids or similar
+            # But for simplicity in many setups, setting it on repartition lines is better.
+            # We'll try to set it if repartition lines are being created or exist.
+            pass # Creating repartition lines from scratch is complex, we will focus on the math first.
+
+        new_tax = self.env['account.tax'].create(create_vals)
         return new_tax, True
 
     def _parse_purchase_bill_detail(self, det_node, included, invoice_attrs):
@@ -260,18 +293,16 @@ class ResConfigSettings(models.TransientModel):
         if tax:
             line_vals['tax_ids'] = [(6, 0, [tax.id])]
             if is_inclusive:
-                # For inclusive, Paraşüt 'total' is the base.
+                # Use GROSS price as unit price for inclusive taxes
                 val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
                 line_vals['price_unit'] = val_to_use / qty
             else:
-                # For exclusive, raw 'unit_price' or 'net_total' is the true net base.
-                # Crucial: Avoid using raw_total here because Odoo adds VAT on top of price_unit.
+                # Use NET price for exclusive taxes
                 if raw_unit > 0:
                     line_vals['price_unit'] = raw_unit
                 elif raw_net > 0:
                     line_vals['price_unit'] = raw_net / qty
                 else:
-                    # Last resort: derive net from total
                     line_vals['price_unit'] = (raw_total - raw_vat) / qty
         else:
             # No tax: total, net, and unit_price should be same.
@@ -515,9 +546,11 @@ class ResConfigSettings(models.TransientModel):
                         if tax:
                             line_vals['tax_ids'] = [(6, 0, [tax.id])]
                             if is_inclusive:
+                                # Use GROSS price as unit price for inclusive taxes
                                 val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
                                 line_vals['price_unit'] = val_to_use / qty
                             else:
+                                # Use NET price for exclusive taxes
                                 if raw_unit > 0:
                                     line_vals['price_unit'] = raw_unit
                                 elif raw_net > 0:
