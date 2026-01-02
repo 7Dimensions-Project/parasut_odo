@@ -427,22 +427,42 @@ class ResConfigSettings(models.TransientModel):
                 
                 # Resolve Partner (Customer)
                 partner_id = False
-                if item.get('relationships', {}).get('contact', {}).get('data'):
-                    contact_id = item['relationships']['contact']['data']['id']
+                contact_data = item.get('relationships', {}).get('contact', {}).get('data')
+                
+                if contact_data:
+                    contact_id = contact_data['id']
+                    # 1. Match by Parasut ID
                     partner_obj = Partner.search([('parasut_id', '=', contact_id)], limit=1)
+                    
+                    if not partner_obj:
+                        # 2. Match by Name if ID fails (find name in included)
+                        contact_node = self._find_in_included(batch['included'], 'contacts', contact_id)
+                        if contact_node:
+                            c_name = contact_node['base_attributes' if 'base_attributes' in contact_node else 'attributes'].get('name')
+                            if not c_name:
+                                c_name = contact_node.get('attributes', {}).get('name')
+                            
+                            if c_name:
+                                partner_obj = Partner.search([('name', '=', c_name)], limit=1)
+                                if partner_obj:
+                                    partner_obj.parasut_id = contact_id # Link them
+                    
                     if partner_obj:
                         partner_id = partner_obj.id
-                
-                if not partner_id:
-                    # Try to create from included
-                    contact_data = item['relationships']['contact']['data']
-                    if contact_data:
-                        contact_node = self._find_in_included(batch['included'], 'contacts', contact_data['id'])
+                    else:
+                        # 3. Create if still not found
+                        contact_node = self._find_in_included(batch['included'], 'contacts', contact_id)
                         if contact_node:
-                            p_vals = {'name': contact_node['attributes']['name'], 'parasut_id': contact_data['id'], 'customer_rank': 1}
+                            attr_node = contact_node.get('attributes', {})
+                            p_vals = {
+                                'name': attr_node.get('name') or 'Paraşüt Müşteri',
+                                'parasut_id': contact_id,
+                            }
                             partner_id = Partner.create(p_vals).id
+                            _logger.info(f"Created new partner for invoice {p_id}: {p_vals['name']}")
 
                 if not partner_id:
+                    _logger.warning(f"Skipping sales invoice {p_id}: Could not resolve partner.")
                     continue
                 
                 # Prepare Lines
