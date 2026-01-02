@@ -188,7 +188,8 @@ class ResConfigSettings(models.TransientModel):
             return taxes[0], True
 
         # FINAL SAFETY: Check for exact name collision before creating to avoid uniqueness error
-        tax_name = f"Paraşüt KDV %{int(rate)} (Dahil - Oto)"
+        # We will use "Hariç" configuration to allow 120k Fiyat / 144k Tutar display
+        tax_name = f"Paraşüt KDV %{int(rate)} (Hariç - Oto)"
         existing_by_name = self.env['account.tax'].with_context(active_test=False).search([('name', '=', tax_name)], limit=1)
         
         # Prepare Account if possible (Mapping to 191 for Purchases)
@@ -198,46 +199,57 @@ class ResConfigSettings(models.TransientModel):
             if account_191:
                 account_id = account_191.id
 
-        # Prepare Tax Group for labeling (Avoid %18 labels on %20 taxes)
+        # Prepare Tax Group for labeling
         tax_group_name = f"KDV %{int(rate)}"
         tax_group = self.env['account.tax.group'].search([('name', '=ilike', tax_group_name)], limit=1)
         if not tax_group:
              tax_group = self.env['account.tax.group'].search([('name', 'ilike', 'KDV')], limit=1)
 
+        # Repartition Lines for Account Mapping (Odoo 17 Style)
+        repartition_vals = {}
+        if account_id:
+            repartition_vals = {
+                'invoice_repartition_line_ids': [
+                    (0, 0, {'repartition_type': 'base'}),
+                    (0, 0, {'repartition_type': 'tax', 'account_id': account_id}),
+                ],
+                'refund_repartition_line_ids': [
+                    (0, 0, {'repartition_type': 'base'}),
+                    (0, 0, {'repartition_type': 'tax', 'account_id': account_id}),
+                ],
+            }
+
         if existing_by_name:
             if not existing_by_name.active:
                 existing_by_name.active = True
-            # Force correct settings even on existing taxes
+            # Force "Hariç" to enable 120k/144k mapping precisely as requested
             update_vals = {
-                'price_include': True,
-                'include_base_amount': False, # Critical: No "tax on tax"
+                'price_include': False, # Exclusive for Net Price entry
+                'include_base_amount': False,
+                'type_tax_use': type_tax_use,
             }
             if tax_group:
                 update_vals['tax_group_id'] = tax_group.id
             existing_by_name.write(update_vals)
-            return existing_by_name[0], True
+            return existing_by_name[0], False # return False for is_inclusive
 
-        # FALLBACK: Create the inclusive tax if it doesn't exist.
+        # FALLBACK: Create the exclusive tax
         create_vals = {
             'name': tax_name,
             'amount': rate,
             'type_tax_use': type_tax_use,
             'amount_type': 'percent',
-            'price_include': True,  # Forced to True for user request
-            'include_base_amount': False, # Critical
-            'description': f"%{int(rate)} (Dahil)",
+            'price_include': False,
+            'include_base_amount': False,
+            'description': f"%{int(rate)}",
         }
         if tax_group:
              create_vals['tax_group_id'] = tax_group.id
-        
-        if account_id:
-            # In Odoo 17+, we map accounts via invoice_repartition_line_ids or similar
-            # But for simplicity in many setups, setting it on repartition lines is better.
-            # We'll try to set it if repartition lines are being created or exist.
-            pass # Creating repartition lines from scratch is complex, we will focus on the math first.
+        if repartition_vals:
+             create_vals.update(repartition_vals)
 
         new_tax = self.env['account.tax'].create(create_vals)
-        return new_tax, True
+        return new_tax, False
 
     def _parse_purchase_bill_detail(self, det_node, included, invoice_attrs):
         """Parse a purchase bill detail node into Odoo line values.

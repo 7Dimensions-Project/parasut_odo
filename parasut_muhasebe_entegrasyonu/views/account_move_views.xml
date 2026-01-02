@@ -7,11 +7,15 @@
         <field name="arch" type="xml">
             <!-- Replace price_subtotal with price_total in invoice lines for visual gross totals -->
             <!-- Using tag-agnostic XPath to avoid tree/list mismatch in different Odoo versions -->
+            <!-- Label price_unit as Net Unit Price and price_total as Gross Total -->
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_unit']" position="attributes">
+                <attribute name="string">Birim Fiyat (Net)</attribute>
+            </xpath>
             <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_subtotal']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
             <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_subtotal']" position="after">
-                <field name="price_total" string="Tutar (KDV Dahil)" optional="show"/>
+                <field name="price_total" string="Tutar (Brüt)" optional="show"/>
             </xpath>
             
             <!-- Add Parasut ID and Total to header for better visibility -->
