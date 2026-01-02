@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_move_form_parasut_inherit" model="ir.ui.view">
-        <name>account.move.form.parasut.inherit</name>
-        <model>account.move</model>
-        <inherit_id ref="account.view_move_form"/>
-        <arch type="xml">
-            <!-- Replace price_subtotal with price_total in invoice lines for visual gross totals -->
-            <xpath expr="//field[@name='invoice_line_ids']//tree//field[@name='price_subtotal']" position="attributes">
-                <attribute name="invisible">1</attribute>
-            </xpath>
-            <xpath expr="//field[@name='invoice_line_ids']//tree//field[@name='price_subtotal']" position="after">
-                <field name="price_total" string="Tutar (KDV Dahil)" optional="show"/>
-            </xpath>
-            
-            <!-- Add Parasut ID and Total to header for better visibility -->
-            <xpath expr="//field[@name='ref']" position="after">
-                <field name="parasut_total_visual" readonly="1" decoration-bf="1"/>
-                <field name="parasut_id" readonly="1" groups="base.group_no_one"/>
-            </xpath>
-        </arch>
-    </record>
+    <data>
+        <record id="view_move_form_parasut_inherit" model="ir.ui.view">
+            <name>account.move.form.parasut.inherit</name>
+            <model>account.move</model>
+            <inherit_id ref="account.view_move_form"/>
+            <arch type="xml">
+                <!-- Replace price_subtotal with price_total in invoice lines for visual gross totals -->
+                <xpath expr="//field[@name='invoice_line_ids']//list//field[@name='price_subtotal']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='invoice_line_ids']//list//field[@name='price_subtotal']" position="after">
+                    <field name="price_total" string="Tutar (KDV Dahil)" optional="show"/>
+                </xpath>
+                
+                <!-- Add Parasut ID and Total to header for better visibility -->
+                <xpath expr="//field[@name='ref']" position="after">
+                    <field name="parasut_total_visual" readonly="1" decoration-bf="1"/>
+                    <field name="parasut_id" readonly="1" groups="base.group_no_one"/>
+                </xpath>
+            </arch>
+        </record>
+    </data>
 </odoo>
