@@ -251,23 +251,31 @@ class ResConfigSettings(models.TransientModel):
         # VAT handling
         vat_rate = d_attrs.get('vat_rate')
         tax, is_inclusive = self._find_odoo_tax(vat_rate, 'purchase')
+        
+        # Resilient Price Calculation Logic
+        qty = line_vals['quantity'] or 1.0
+        # Try different sources for net/unit price to avoid 0.00 results
+        raw_net = float(d_attrs.get('net_total') or 0.0)
+        raw_unit = float(d_attrs.get('unit_price') or 0.0)
+        raw_total = float(d_attrs.get('total') or 0.0)
+        raw_vat = float(d_attrs.get('vat_amount') or 0.0)
+
         if tax:
             line_vals['tax_ids'] = [(6, 0, [tax.id])]
-            qty = line_vals['quantity'] or 1.0
-            total = float(d_attrs.get('total', 0.0))
-            vat_amount = float(d_attrs.get('vat_amount', 0.0))
-            
             if is_inclusive:
-                # Use total / quantity to get exact inclusive price_unit
-                line_vals['price_unit'] = total / qty
+                # Prioritize 'total' for inclusive taxes
+                val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
+                line_vals['price_unit'] = val_to_use / qty
             else:
-                # Use (total - vat_amount) / quantity to get exact net price_unit
-                # This ensures Odoo adds tax on top correctly to match Paraşüt Total
-                line_vals['price_unit'] = (total - vat_amount) / qty
+                # Prioritize 'net_total' or 'unit_price' for exclusive taxes
+                # (total - vat_amount) is a fallback if net_total is missing
+                val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else (raw_total - raw_vat))
+                line_vals['price_unit'] = val_to_use / qty
         else:
-             # No tax, use total (which is same as net in this case)
-             total = float(d_attrs.get('total', 0.0))
-             line_vals['price_unit'] = total / (line_vals['quantity'] or 1.0)
+            # No tax: use net_total or unit_price or total
+            val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else raw_total)
+            line_vals['price_unit'] = val_to_use / qty
+
         return line_vals
 
     def action_sync_accounts(self):
@@ -497,17 +505,22 @@ class ResConfigSettings(models.TransientModel):
                         tax, is_inclusive = self._find_odoo_tax(vat_rate, 'sale')
 
                         qty = line_vals['quantity'] or 1.0
-                        total = float(d_attrs.get('total', 0.0))
-                        vat_amount = float(d_attrs.get('vat_amount', 0.0))
+                        raw_net = float(d_attrs.get('net_total') or 0.0)
+                        raw_unit = float(d_attrs.get('unit_price') or 0.0)
+                        raw_total = float(d_attrs.get('total') or 0.0)
+                        raw_vat = float(d_attrs.get('vat_amount') or 0.0)
 
                         if tax:
                             line_vals['tax_ids'] = [(6, 0, [tax.id])]
                             if is_inclusive:
-                                line_vals['price_unit'] = total / qty
+                                val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
+                                line_vals['price_unit'] = val_to_use / qty
                             else:
-                                line_vals['price_unit'] = (total - vat_amount) / qty
+                                val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else (raw_total - raw_vat))
+                                line_vals['price_unit'] = val_to_use / qty
                         else:
-                            line_vals['price_unit'] = total / qty
+                            val_to_use = raw_net if raw_net > 0 else (raw_unit if raw_unit > 0 else raw_total)
+                            line_vals['price_unit'] = val_to_use / qty
                         
                         invoice_lines.append((0, 0, line_vals))
                 
