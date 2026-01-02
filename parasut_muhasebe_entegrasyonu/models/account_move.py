@@ -9,3 +9,6 @@ class AccountMove(models.Model):
         ('paid', 'Paid'),
         ('partially_paid', 'Partially Paid')
     ], string='Parasut Payment Status', help="Payment status received from Parasut")
+    
+    parasut_total_visual = fields.Monetary(string='Toplam (Vergi dahil) - P', help="Paraşüt'ten gelen vergi dahil toplam tutar")
+    currency_id = fields.Many2one('res.currency', related='company_id.currency_id')

@@ -158,55 +158,48 @@ class ResConfigSettings(models.TransientModel):
         # 2. Exact amount match in ANY usage
         # 3. Name match (contains rate) in ANY usage
         
-        # Priority 1: Exact Amount + Exact Usage
+        # Priority 1: Exact Amount + Exact Usage + INCLUSIVE ONLY
         taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
             ('type_tax_use', '=', type_tax_use),
+            ('price_include', '=', True),
             ('active', '=', True)
         ], order='sequence')
         if taxes:
-            # Setting: Prioritizing INCLUSIVE (price_include=True) for visual gross totals
-            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
-            return sorted_taxes[0], sorted_taxes[0].price_include
+            return taxes[0], True
 
-        # Priority 2: Exact Amount in ANY Usage (Sale, Purchase, None)
+        # Priority 2: Exact Amount in ANY Usage + INCLUSIVE ONLY
         taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
+            ('price_include', '=', True),
             ('active', '=', True)
         ], order='type_tax_use desc, sequence')
         if taxes:
-            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
-            return sorted_taxes[0], sorted_taxes[0].price_include
+            return taxes[0], True
 
-        # Priority 3: Name Match ("%20", "20", etc.)
+        # Priority 3: Name Match ("%20", "20", etc.) + INCLUSIVE ONLY
         search_str = str(int(rate))
         taxes = self.env['account.tax'].search([
             ('name', 'ilike', search_str),
+            ('price_include', '=', True),
             ('active', '=', True)
         ], order='sequence')
-        
         if taxes:
-            best_match = False
-            # First, try to find an exact amount match among the name matches
-            for t in taxes:
-                if abs(t.amount - rate) < 0.001 or abs(t.amount - (rate/100.0)) < 0.001:
-                    best_match = t
-                    break
-            if not best_match:
-                # If no exact amount match, just pick the first one, prioritizing inclusive
-                best_match = taxes.sorted(key=lambda t: t.price_include, reverse=True)[0]
-            return best_match, best_match.price_include
+            return taxes[0], True
 
-        # FALLBACK: Create the tax if it doesn't exist to ensure result.
-        # This automates tax creation for missing rates like %20, %10 etc.
-        tax_name = f"Paraşüt KDV %{int(rate)} (Oto)"
+        # FALLBACK: If no inclusive tax found, try exclusive BEFORE creating.
+        # But we prefer creating an inclusive one to satisfy visual requirements.
+        # So we skip exclusive fallbacks unless the user has them explicitly named correctly.
+        
+        # New FALLBACK: Create the inclusive tax if it doesn't exist.
+        tax_name = f"Paraşüt KDV %{int(rate)} (Dahil - Oto)"
         new_tax = self.env['account.tax'].create({
             'name': tax_name,
             'amount': rate,
             'type_tax_use': type_tax_use,
             'amount_type': 'percent',
-            'price_include': True,  # Defaulting to True for visual gross totals (user request)
-            'description': f"%{int(rate)}",
+            'price_include': True,  # Forced to True for user request
+            'description': f"%{int(rate)} (Dahil)",
         })
         return new_tax, True
 
@@ -546,6 +539,7 @@ class ResConfigSettings(models.TransientModel):
                     'move_type': 'out_invoice',
                     'parasut_id': p_id,
                     'partner_id': partner_id,
+                    'parasut_total_visual': float(attrs.get('total') or 0.0),
                     'invoice_date': attrs.get('issue_date') or fields.Date.today(),
                     'date': attrs.get('issue_date') or fields.Date.today(),
                     'invoice_date_due': attrs.get('due_date') or attrs.get('issue_date') or fields.Date.today(),
@@ -962,6 +956,7 @@ class ResConfigSettings(models.TransientModel):
                     'move_type': 'in_invoice',
                     'parasut_id': p_id,
                     'partner_id': partner_id,
+                    'parasut_total_visual': float(attrs.get('total') or 0.0),
                     'invoice_date': attrs.get('issue_date') or fields.Date.today(),
                     'date': attrs.get('issue_date') or fields.Date.today(),
                     'invoice_date_due': attrs.get('due_date') or attrs.get('issue_date') or fields.Date.today(),
