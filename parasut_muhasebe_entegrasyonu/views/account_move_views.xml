@@ -6,11 +6,11 @@
         <field name="inherit_id" ref="account.view_move_form"/>
         <field name="arch" type="xml">
             <!-- Replace price_subtotal with price_total in invoice lines for visual gross totals -->
-            <!-- Using //tree as standard, Odoo 17+ supports both tree and list tags -->
-            <xpath expr="//field[@name='invoice_line_ids']//tree//field[@name='price_subtotal']" position="attributes">
+            <!-- Using tag-agnostic XPath to avoid tree/list mismatch in different Odoo versions -->
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_subtotal']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
-            <xpath expr="//field[@name='invoice_line_ids']//tree//field[@name='price_subtotal']" position="after">
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_subtotal']" position="after">
                 <field name="price_total" string="Tutar (KDV Dahil)" optional="show"/>
             </xpath>
             
