@@ -187,12 +187,15 @@ class ResConfigSettings(models.TransientModel):
         if taxes:
             return taxes[0], True
 
-        # FALLBACK: If no inclusive tax found, try exclusive BEFORE creating.
-        # But we prefer creating an inclusive one to satisfy visual requirements.
-        # So we skip exclusive fallbacks unless the user has them explicitly named correctly.
-        
-        # New FALLBACK: Create the inclusive tax if it doesn't exist.
+        # FINAL SAFETY: Check for exact name collision before creating to avoid uniqueness error
         tax_name = f"Paraşüt KDV %{int(rate)} (Dahil - Oto)"
+        existing_by_name = self.env['account.tax'].with_context(active_test=False).search([('name', '=', tax_name)], limit=1)
+        if existing_by_name:
+            if not existing_by_name.active:
+                existing_by_name.active = True
+            return existing_by_name[0], True
+
+        # FALLBACK: Create the inclusive tax if it doesn't exist.
         new_tax = self.env['account.tax'].create({
             'name': tax_name,
             'amount': rate,
