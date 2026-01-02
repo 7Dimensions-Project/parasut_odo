@@ -165,8 +165,8 @@ class ResConfigSettings(models.TransientModel):
             ('active', '=', True)
         ], order='sequence')
         if taxes:
-            # Reverting: Prioritizing EXCLUSIVE (price_include=False) for calculation safety
-            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=False)
+            # Setting: Prioritizing INCLUSIVE (price_include=True) for visual gross totals
+            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
             return sorted_taxes[0], sorted_taxes[0].price_include
 
         # Priority 2: Exact Amount in ANY Usage (Sale, Purchase, None)
@@ -175,7 +175,7 @@ class ResConfigSettings(models.TransientModel):
             ('active', '=', True)
         ], order='type_tax_use desc, sequence')
         if taxes:
-            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=False)
+            sorted_taxes = taxes.sorted(key=lambda t: t.price_include, reverse=True)
             return sorted_taxes[0], sorted_taxes[0].price_include
 
         # Priority 3: Name Match ("%20", "20", etc.)
@@ -193,21 +193,22 @@ class ResConfigSettings(models.TransientModel):
                     best_match = t
                     break
             if not best_match:
-                # If no exact amount match, just pick the first one, prioritizing exclusive
-                best_match = taxes.sorted(key=lambda t: t.price_include, reverse=False)[0]
+                # If no exact amount match, just pick the first one, prioritizing inclusive
+                best_match = taxes.sorted(key=lambda t: t.price_include, reverse=True)[0]
             return best_match, best_match.price_include
 
         # FALLBACK: Create the tax if it doesn't exist to ensure result.
+        # This automates tax creation for missing rates like %20, %10 etc.
         tax_name = f"Paraşüt KDV %{int(rate)} (Oto)"
         new_tax = self.env['account.tax'].create({
             'name': tax_name,
             'amount': rate,
             'type_tax_use': type_tax_use,
             'amount_type': 'percent',
-            'price_include': False,  # Defaulting to false for safety and net prices
+            'price_include': True,  # Defaulting to True for visual gross totals (user request)
             'description': f"%{int(rate)}",
         })
-        return new_tax, False
+        return new_tax, True
 
     def _parse_purchase_bill_detail(self, det_node, included, invoice_attrs):
         """Parse a purchase bill detail node into Odoo line values.
