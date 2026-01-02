@@ -408,7 +408,7 @@ class ResConfigSettings(models.TransientModel):
 
     def action_sync_sales_invoices(self):
         """ Sync Sales Invoices (Satış Faturaları) """
-        params = {'include': 'details,contact', 'sort': '-issue_date'}
+        params = {'include': 'details,details.product,contact', 'sort': '-issue_date'}
         batches = self._fetch_from_parasut('sales_invoices', params=params)
         Move = self.env['account.move']
         Partner = self.env['res.partner']
@@ -421,9 +421,8 @@ class ResConfigSettings(models.TransientModel):
                 attrs = item['attributes']
                 p_id = item['id']
                 
-                # Check if exists
-                if Move.search([('parasut_id', '=', p_id), ('move_type', '=', 'out_invoice')], limit=1):
-                    continue
+                # Check exist
+                existing_move = Move.search([('parasut_id', '=', p_id), ('move_type', '=', 'out_invoice')], limit=1)
                 
                 # Resolve Partner (Customer)
                 partner_id = False
@@ -516,11 +515,21 @@ class ResConfigSettings(models.TransientModel):
                     'invoice_line_ids': invoice_lines,
                 }
                 
-                move = Move.create(move_vals)
-                move.action_post()
+                if existing_move:
+                    # UPDATE logic similar to purchase bills
+                    if existing_move.state == 'posted':
+                        existing_move.button_draft()
+                    move_vals['invoice_line_ids'].insert(0, (5, 0, 0)) # Clear lines
+                    existing_move.write(move_vals)
+                    existing_move.action_post()
+                else:
+                    # CREATE
+                    move = Move.create(move_vals)
+                    move.action_post()
+                
                 processed += 1
         
-        return self._return_notification("Sales Invoices Synced", f"{processed} invoices created.")
+        return self._return_notification("Sales Invoices Synced", f"{processed} invoices processed (created/updated).")
 
     def action_sync_sales_payments(self):
         """ Sync Sales Payments (Müşteri Tahsilatları) """
