@@ -158,34 +158,34 @@ class ResConfigSettings(models.TransientModel):
         # 2. Exact amount match in ANY usage
         # 3. Name match (contains rate) in ANY usage
         
-        # Priority 1: Exact Amount + Exact Usage + INCLUSIVE ONLY
+        # Priority 1: Exact Amount + Exact Usage + EXCLUSIVE ONLY
         taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
             ('type_tax_use', '=', type_tax_use),
-            ('price_include', '=', True),
+            ('price_include', '=', False),
             ('active', '=', True)
         ], order='sequence')
         if taxes:
-            return taxes[0], True
+            return taxes[0], False
 
-        # Priority 2: Exact Amount in ANY Usage + INCLUSIVE ONLY
+        # Priority 2: Exact Amount in ANY Usage + EXCLUSIVE ONLY
         taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
-            ('price_include', '=', True),
+            ('price_include', '=', False),
             ('active', '=', True)
         ], order='type_tax_use desc, sequence')
         if taxes:
-            return taxes[0], True
+            return taxes[0], False
 
-        # Priority 3: Name Match ("%20", "20", etc.) + INCLUSIVE ONLY
+        # Priority 3: Name Match ("%20", "20", etc.) + EXCLUSIVE ONLY
         search_str = str(int(rate))
         taxes = self.env['account.tax'].search([
             ('name', 'ilike', search_str),
-            ('price_include', '=', True),
+            ('price_include', '=', False),
             ('active', '=', True)
         ], order='sequence')
         if taxes:
-            return taxes[0], True
+            return taxes[0], False
 
         # FINAL SAFETY: Check for exact name collision before creating to avoid uniqueness error
         # We will use "Hariç" configuration to allow 120k Fiyat / 144k Tutar display
@@ -309,7 +309,7 @@ class ResConfigSettings(models.TransientModel):
                 val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
                 line_vals['price_unit'] = val_to_use / qty
             else:
-                # Use NET price for exclusive taxes
+                # Use NET price for exclusive taxes (120k display per user request)
                 if raw_unit > 0:
                     line_vals['price_unit'] = raw_unit
                 elif raw_net > 0:
@@ -317,7 +317,7 @@ class ResConfigSettings(models.TransientModel):
                 else:
                     line_vals['price_unit'] = (raw_total - raw_vat) / qty
         else:
-            # No tax: total, net, and unit_price should be same.
+            # No tax: match Paraşüt net unit if possible
             val_to_use = raw_unit if raw_unit > 0 else (raw_net if raw_net > 0 else raw_total)
             line_vals['price_unit'] = val_to_use if (val_to_use == raw_unit) else (val_to_use / qty)
 
@@ -587,7 +587,7 @@ class ResConfigSettings(models.TransientModel):
                     'move_type': 'out_invoice',
                     'parasut_id': p_id,
                     'partner_id': partner_id,
-                    'parasut_total_visual': float(attrs.get('total') or 0.0),
+                    'parasut_total_visual': float(attrs.get('total') or attrs.get('net_total', 0) + attrs.get('vat_total', 0)),
                     'invoice_date': attrs.get('issue_date') or fields.Date.today(),
                     'date': attrs.get('issue_date') or fields.Date.today(),
                     'invoice_date_due': attrs.get('due_date') or attrs.get('issue_date') or fields.Date.today(),
@@ -1004,7 +1004,7 @@ class ResConfigSettings(models.TransientModel):
                     'move_type': 'in_invoice',
                     'parasut_id': p_id,
                     'partner_id': partner_id,
-                    'parasut_total_visual': float(attrs.get('total') or 0.0),
+                    'parasut_total_visual': float(attrs.get('total') or attrs.get('net_total', 0) + attrs.get('vat_total', 0)),
                     'invoice_date': attrs.get('issue_date') or fields.Date.today(),
                     'date': attrs.get('issue_date') or fields.Date.today(),
                     'invoice_date_due': attrs.get('due_date') or attrs.get('issue_date') or fields.Date.today(),
