@@ -253,21 +253,21 @@ class ResConfigSettings(models.TransientModel):
         tax, is_inclusive = self._find_odoo_tax(vat_rate, 'purchase')
         if tax:
             line_vals['tax_ids'] = [(6, 0, [tax.id])]
-            # Match Paraşüt's visual "Gross" price in lines
             qty = line_vals['quantity'] or 1.0
+            total = float(d_attrs.get('total', 0.0))
+            vat_amount = float(d_attrs.get('vat_amount', 0.0))
+            
             if is_inclusive:
                 # Use total / quantity to get exact inclusive price_unit
-                total = float(d_attrs.get('total', 0.0))
                 line_vals['price_unit'] = total / qty
             else:
-                # Use net_total / quantity to get exact exclusive price_unit
-                net_total = float(d_attrs.get('net_total', 0.0))
-                line_vals['price_unit'] = net_total / qty
+                # Use (total - vat_amount) / quantity to get exact net price_unit
+                # This ensures Odoo adds tax on top correctly to match Paraşüt Total
+                line_vals['price_unit'] = (total - vat_amount) / qty
         else:
-             # No tax, just use unit_price as is or net_total/qty
-             net_total = float(d_attrs.get('net_total', 0.0))
-             if net_total > 0:
-                 line_vals['price_unit'] = net_total / (line_vals['quantity'] or 1.0)
+             # No tax, use total (which is same as net in this case)
+             total = float(d_attrs.get('total', 0.0))
+             line_vals['price_unit'] = total / (line_vals['quantity'] or 1.0)
         return line_vals
 
     def action_sync_accounts(self):
@@ -497,19 +497,17 @@ class ResConfigSettings(models.TransientModel):
                         tax, is_inclusive = self._find_odoo_tax(vat_rate, 'sale')
 
                         qty = line_vals['quantity'] or 1.0
+                        total = float(d_attrs.get('total', 0.0))
+                        vat_amount = float(d_attrs.get('vat_amount', 0.0))
+
                         if tax:
                             line_vals['tax_ids'] = [(6, 0, [tax.id])]
                             if is_inclusive:
-                                # Show gross price in the line to match Paraşüt
-                                total = float(d_attrs.get('total', 0.0))
                                 line_vals['price_unit'] = total / qty
                             else:
-                                net_total = float(d_attrs.get('net_total', 0.0))
-                                line_vals['price_unit'] = net_total / qty
+                                line_vals['price_unit'] = (total - vat_amount) / qty
                         else:
-                            net_total = float(d_attrs.get('net_total', 0.0))
-                            if net_total > 0:
-                                line_vals['price_unit'] = net_total / qty
+                            line_vals['price_unit'] = total / qty
                         
                         invoice_lines.append((0, 0, line_vals))
                 
