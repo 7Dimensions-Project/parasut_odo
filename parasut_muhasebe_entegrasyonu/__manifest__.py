@@ -1,6 +1,6 @@
 {
     'name': 'Paraşüt Odoo Muhasebe Entegrasyonu',
-    'version': '19.0.1.1.11',
+    'version': '19.0.1.1.12',
     'summary': 'Paraşüt ve Odoo arasında otomatik muhasebe senkronizasyonu',
     'description': """
 Paraşüt Odoo Muhasebe Entegrasyonu
@@ -35,7 +35,7 @@ Support:
 --------
 For questions, issues, or feature requests, please contact us through GitHub.
 
-**Version:** 19.0.1.1.11
+**Version:** 19.0.1.1.12
     """,
     'category': 'Accounting/Accounting',
     'author': '7Dimensions',

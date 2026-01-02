@@ -254,13 +254,20 @@ class ResConfigSettings(models.TransientModel):
         if tax:
             line_vals['tax_ids'] = [(6, 0, [tax.id])]
             # Match Paraşüt's visual "Gross" price in lines
-            # Odoo only shows the gross price in the 'Price/Amount' column IF the tax is inclusive.
+            qty = line_vals['quantity'] or 1.0
             if is_inclusive:
-                line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
+                # Use total / quantity to get exact inclusive price_unit
+                total = float(d_attrs.get('total', 0.0))
+                line_vals['price_unit'] = total / qty
             else:
-                # If the tax is NOT inclusive, the user will still see the NET price in the line.
-                # We apply the tax anyway so the TOTAL in the footer is correct.
-                pass
+                # Use net_total / quantity to get exact exclusive price_unit
+                net_total = float(d_attrs.get('net_total', 0.0))
+                line_vals['price_unit'] = net_total / qty
+        else:
+             # No tax, just use unit_price as is or net_total/qty
+             net_total = float(d_attrs.get('net_total', 0.0))
+             if net_total > 0:
+                 line_vals['price_unit'] = net_total / (line_vals['quantity'] or 1.0)
         return line_vals
 
     def action_sync_accounts(self):
@@ -488,11 +495,21 @@ class ResConfigSettings(models.TransientModel):
                         # VAT Rate
                         vat_rate = d_attrs.get('vat_rate')
                         tax, is_inclusive = self._find_odoo_tax(vat_rate, 'sale')
+
+                        qty = line_vals['quantity'] or 1.0
                         if tax:
                             line_vals['tax_ids'] = [(6, 0, [tax.id])]
                             if is_inclusive:
                                 # Show gross price in the line to match Paraşüt
-                                line_vals['price_unit'] = line_vals['price_unit'] * (1 + (float(vat_rate) / 100.0))
+                                total = float(d_attrs.get('total', 0.0))
+                                line_vals['price_unit'] = total / qty
+                            else:
+                                net_total = float(d_attrs.get('net_total', 0.0))
+                                line_vals['price_unit'] = net_total / qty
+                        else:
+                            net_total = float(d_attrs.get('net_total', 0.0))
+                            if net_total > 0:
+                                line_vals['price_unit'] = net_total / qty
                         
                         invoice_lines.append((0, 0, line_vals))
                 
