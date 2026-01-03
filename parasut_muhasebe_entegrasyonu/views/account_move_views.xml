@@ -7,20 +7,19 @@
         <field name="arch" type="xml">
             <!-- Replace price_subtotal with price_total in invoice lines for visual gross totals -->
             <!-- Using tag-agnostic XPath to avoid tree/list mismatch in different Odoo versions -->
-            <!-- Label price_unit as Net Unit Price and price_total as Gross Total -->
+            <!-- Force display of price_total (Gross) instead of price_subtotal (Net) -->
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_subtotal']" position="replace">
+                <field name="price_total" string="Tutar (Brüt)" widget="monetary" decoration-bf="1"/>
+            </xpath>
+
+            <!-- Rename price_unit to Birim Fiyat (Net) -->
             <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_unit']" position="attributes">
                 <attribute name="string">Birim Fiyat (Net)</attribute>
             </xpath>
-            <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_subtotal']" position="attributes">
-                <attribute name="invisible">1</attribute>
-            </xpath>
-            <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_subtotal']" position="after">
-                <field name="price_total" string="Tutar (Brüt)" optional="show"/>
-            </xpath>
             
-            <!-- Add Parasut ID and Total to header for better visibility -->
+            <!-- Update header visual field -->
             <xpath expr="//field[@name='ref']" position="after">
-                <field name="parasut_total_visual" readonly="1" decoration-bf="1"/>
+                <field name="parasut_total_visual" string="Toplam (Vergi dahil) - P" readonly="1" decoration-danger="1" decoration-bf="1"/>
                 <field name="parasut_id" readonly="1" groups="base.group_no_one"/>
             </xpath>
         </field>

@@ -158,7 +158,7 @@ class ResConfigSettings(models.TransientModel):
         # 2. Exact amount match in ANY usage
         # 3. Name match (contains rate) in ANY usage
         
-        # Priority 1: Exact Amount + Exact Usage + EXCLUSIVE ONLY
+        # Priority 1: Exact Amount + Exact Usage + EXCLUSIVE PREFERRED
         taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
             ('type_tax_use', '=', type_tax_use),
@@ -168,7 +168,7 @@ class ResConfigSettings(models.TransientModel):
         if taxes:
             return taxes[0], False
 
-        # Priority 2: Exact Amount in ANY Usage + EXCLUSIVE ONLY
+        # Priority 2: Exact Amount in ANY Usage + EXCLUSIVE PREFERRED
         taxes = self.env['account.tax'].search([
             ('amount', 'in', [rate, rate / 100.0]),
             ('price_include', '=', False),
@@ -177,7 +177,7 @@ class ResConfigSettings(models.TransientModel):
         if taxes:
             return taxes[0], False
 
-        # Priority 3: Name Match ("%20", "20", etc.) + EXCLUSIVE ONLY
+        # Priority 3: Name Match ("%20", "20", etc.) + EXCLUSIVE PREFERRED
         search_str = str(int(rate))
         taxes = self.env['account.tax'].search([
             ('name', 'ilike', search_str),
@@ -187,25 +187,37 @@ class ResConfigSettings(models.TransientModel):
         if taxes:
             return taxes[0], False
 
-        # FINAL SAFETY: Check for exact name collision before creating to avoid uniqueness error
-        # We will use "Hariç" configuration to allow 120k Fiyat / 144k Tutar display
-        tax_name = f"Paraşüt KDV %{int(rate)} (Hariç - Oto)"
-        existing_by_name = self.env['account.tax'].with_context(active_test=False).search([('name', '=', tax_name)], limit=1)
+        # FALLBACK: Try to find ANY Paraşüt tax and force it to Exclusive (Hariç)
+        tax_name_h = f"Paraşüt KDV %{int(rate)} (Hariç - Oto)"
+        tax_name_d = f"Paraşüt KDV %{int(rate)} (Dahil - Oto)"
+        existing = self.env['account.tax'].with_context(active_test=False).search([
+            ('name', 'in', [tax_name_h, tax_name_d])
+        ], limit=1)
         
-        # Prepare Account if possible (Mapping to 191 for Purchases)
+        if existing:
+            if not existing.active:
+                existing.active = True
+            existing.write({
+                'name': tax_name_h,
+                'price_include': False,
+                'include_base_amount': False, # Critical: Affects matrah
+            })
+            return existing[0], False
+
+        # Prepare Account for new tax creation (191)
         account_id = False
         if type_tax_use == 'purchase':
             account_191 = self.env['account.account'].search([('code', '=ilike', '191%')], limit=1)
             if account_191:
-                account_id = account_191.id
+                account_id = account_id = account_191.id
 
-        # Prepare Tax Group for labeling
+        # Prepare Tax Group
         tax_group_name = f"KDV %{int(rate)}"
         tax_group = self.env['account.tax.group'].search([('name', '=ilike', tax_group_name)], limit=1)
         if not tax_group:
              tax_group = self.env['account.tax.group'].search([('name', 'ilike', 'KDV')], limit=1)
 
-        # Repartition Lines for Account Mapping (Odoo 17 Style)
+        # Repartition Lines
         repartition_vals = {}
         if account_id:
             repartition_vals = {
@@ -304,20 +316,15 @@ class ResConfigSettings(models.TransientModel):
 
         if tax:
             line_vals['tax_ids'] = [(6, 0, [tax.id])]
-            if is_inclusive:
-                # Use GROSS price as unit price for inclusive taxes
-                val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
-                line_vals['price_unit'] = val_to_use / qty
+            # Strictly use NET price for calculation if tax exists
+            if raw_unit > 0:
+                line_vals['price_unit'] = raw_unit
+            elif raw_net > 0:
+                line_vals['price_unit'] = raw_net / qty
             else:
-                # Use NET price for exclusive taxes (120k display per user request)
-                if raw_unit > 0:
-                    line_vals['price_unit'] = raw_unit
-                elif raw_net > 0:
-                    line_vals['price_unit'] = raw_net / qty
-                else:
-                    line_vals['price_unit'] = (raw_total - raw_vat) / qty
+                line_vals['price_unit'] = (raw_total - raw_vat) / qty
         else:
-            # No tax: match Paraşüt net unit if possible
+            # No tax: match Paraşüt net unit or derived total
             val_to_use = raw_unit if raw_unit > 0 else (raw_net if raw_net > 0 else raw_total)
             line_vals['price_unit'] = val_to_use if (val_to_use == raw_unit) else (val_to_use / qty)
 
@@ -557,18 +564,13 @@ class ResConfigSettings(models.TransientModel):
 
                         if tax:
                             line_vals['tax_ids'] = [(6, 0, [tax.id])]
-                            if is_inclusive:
-                                # Use GROSS price as unit price for inclusive taxes
-                                val_to_use = raw_total if raw_total > 0 else (raw_net + raw_vat if raw_net > 0 else raw_unit * (1 + (float(vat_rate or 0)/100.0)))
-                                line_vals['price_unit'] = val_to_use / qty
+                            # Strictly use NET price
+                            if raw_unit > 0:
+                                line_vals['price_unit'] = raw_unit
+                            elif raw_net > 0:
+                                line_vals['price_unit'] = raw_net / qty
                             else:
-                                # Use NET price for exclusive taxes
-                                if raw_unit > 0:
-                                    line_vals['price_unit'] = raw_unit
-                                elif raw_net > 0:
-                                    line_vals['price_unit'] = raw_net / qty
-                                else:
-                                    line_vals['price_unit'] = (raw_total - raw_vat) / qty
+                                line_vals['price_unit'] = (raw_total - raw_vat) / qty
                         else:
                             val_to_use = raw_unit if raw_unit > 0 else (raw_net if raw_net > 0 else raw_total)
                             line_vals['price_unit'] = val_to_use if (val_to_use == raw_unit) else (val_to_use / qty)
