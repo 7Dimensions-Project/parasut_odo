@@ -58,7 +58,7 @@ For questions, issues, or feature requests, please contact us through GitHub.
     'application': True,
     'auto_install': False,
     'license': 'OPL-1',
-    'price': 149.00,
+    'price': 0,
     'currency': 'EUR',
     'support': 'support@7dimensions.eu',
     'maintainer': '7Dimensions',
